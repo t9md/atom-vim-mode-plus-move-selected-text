@@ -17,8 +17,12 @@ class MoveSelectedTextUp extends TransformString
   flashTarget: false
   execute: ->
     return unless @isMode('visual')
-    @eachSelection (selection) =>
-      @mutate(selection)
+    return unless @selectTarget()
+    selections = @editor.getSelectionsOrderedByBufferPosition()
+    selections.reverse() if @direction is 'down'
+    @editor.transact =>
+      for selection in selections
+        @mutate(selection)
 
   mutate: (selection) ->
     switch @vimState.submode
