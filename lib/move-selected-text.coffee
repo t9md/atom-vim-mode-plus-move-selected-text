@@ -10,19 +10,38 @@ TransformString = Base.getClass('Operator')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
 CommandPrefix = 'vim-mode-plus-user'
+stateByEditor = new Map
+checkPointByEditor = new Map
 # -------------------------
-class MoveSelectedTextUp extends TransformString
+class MoveSelectedText extends TransformString
+  getSelectedTexts: ->
+    @editor.getSelections().map((selection) -> selection.getText()).join('')
+
+  withUndoJoin: (fn) ->
+    unless (isSequential = stateByEditor.get(@editor) is @getSelectedTexts())
+      checkPointByEditor.set(@editor, @editor.createCheckpoint())
+
+    fn()
+
+    stateByEditor.set(@editor, @getSelectedTexts())
+    if isSequential and checkPointByEditor.has(@editor)
+      @editor.groupChangesSinceCheckpoint(checkPointByEditor.get(@editor))
+
+class MoveSelectedTextUp extends MoveSelectedText
   @commandPrefix: CommandPrefix
   direction: 'up'
   flashTarget: false
+
   execute: ->
     return unless @isMode('visual')
     return unless @selectTarget()
-    selections = @editor.getSelectionsOrderedByBufferPosition()
-    selections.reverse() if @direction is 'down'
-    @editor.transact =>
-      for selection in selections
-        @mutate(selection)
+
+    @withUndoJoin =>
+      selections = @editor.getSelectionsOrderedByBufferPosition()
+      selections.reverse() if @direction is 'down'
+      @editor.transact =>
+        for selection in selections
+          @mutate(selection)
 
   mutate: (selection) ->
     switch @vimState.submode
@@ -100,15 +119,16 @@ class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
 
 # -------------------------
-class MoveSelectedTextRight extends TransformString
+class MoveSelectedTextRight extends MoveSelectedText
   @commandPrefix: CommandPrefix
   direction: 'right'
   flashTarget: false
 
   execute: ->
     return unless @isMode('visual')
-    @eachSelection (selection) =>
-      @mutate(selection)
+    @withUndoJoin =>
+      @eachSelection (selection) =>
+        @mutate(selection)
 
   mutate: (selection) ->
     switch @vimState.submode
