@@ -16,6 +16,8 @@ checkPointByEditor = new Map
 disposableByEditor = new Map
 # -------------------------
 class MoveSelectedText extends TransformString
+  @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
+
   countTimes: (fn) ->
     _.times @getCount(), ->
       fn()
@@ -45,8 +47,6 @@ class MoveSelectedTextUp extends MoveSelectedText
   flashTarget: false
 
   execute: ->
-    return unless @isMode('visual')
-
     @withUndoJoin =>
       selections = @editor.getSelectionsOrderedByBufferPosition()
       selections.reverse() if @direction is 'down'
@@ -137,8 +137,6 @@ class MoveSelectedTextRight extends MoveSelectedText
   flashTarget: false
 
   execute: ->
-    return unless @isMode('visual')
-
     @withUndoJoin =>
       @eachSelection (selection) =>
         @countTimes =>
