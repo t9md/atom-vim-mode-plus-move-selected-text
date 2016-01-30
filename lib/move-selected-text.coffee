@@ -1,4 +1,5 @@
 _ = require 'underscore-plus'
+{CompositeDisposable} = require 'atom'
 
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
@@ -12,20 +13,30 @@ swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 CommandPrefix = 'vim-mode-plus-user'
 stateByEditor = new Map
 checkPointByEditor = new Map
+disposableByEditor = new Map
 # -------------------------
 class MoveSelectedText extends TransformString
+  countTimes: (fn) ->
+    _.times @getCount(), ->
+      fn()
+
   getSelectedTexts: ->
     @editor.getSelections().map((selection) -> selection.getText()).join('')
 
   withUndoJoin: (fn) ->
-    unless (isSequential = stateByEditor.get(@editor) is @getSelectedTexts())
-      checkPointByEditor.set(@editor, @editor.createCheckpoint())
+    unless disposableByEditor.has(@editor)
+      disposableByEditor.set @editor, @editor.onDidDestroy =>
+        checkPointByEditor.delete(@editor)
+        stateByEditor.delete(@editor)
 
+    isSequential = stateByEditor.get(@editor) is @getSelectedTexts()
+    unless isSequential
+      checkPointByEditor.set(@editor, @editor.createCheckpoint())
     fn()
 
     stateByEditor.set(@editor, @getSelectedTexts())
-    if isSequential and checkPointByEditor.has(@editor)
-      @editor.groupChangesSinceCheckpoint(checkPointByEditor.get(@editor))
+    if isSequential and (checkpoint = checkPointByEditor.get(@editor))
+      @editor.groupChangesSinceCheckpoint(checkpoint)
 
 class MoveSelectedTextUp extends MoveSelectedText
   @commandPrefix: CommandPrefix
@@ -34,14 +45,14 @@ class MoveSelectedTextUp extends MoveSelectedText
 
   execute: ->
     return unless @isMode('visual')
-    return unless @selectTarget()
 
     @withUndoJoin =>
       selections = @editor.getSelectionsOrderedByBufferPosition()
       selections.reverse() if @direction is 'down'
       @editor.transact =>
         for selection in selections
-          @mutate(selection)
+          @countTimes =>
+            @mutate(selection)
 
   mutate: (selection) ->
     switch @vimState.submode
@@ -126,9 +137,11 @@ class MoveSelectedTextRight extends MoveSelectedText
 
   execute: ->
     return unless @isMode('visual')
+
     @withUndoJoin =>
       @eachSelection (selection) =>
-        @mutate(selection)
+        @countTimes =>
+          @mutate(selection)
 
   mutate: (selection) ->
     switch @vimState.submode
