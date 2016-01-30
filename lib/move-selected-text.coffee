@@ -28,6 +28,7 @@ class MoveSelectedText extends TransformString
       disposableByEditor.set @editor, @editor.onDidDestroy =>
         checkPointByEditor.delete(@editor)
         stateByEditor.delete(@editor)
+        disposableByEditor.delete(@editor)
 
     isSequential = stateByEditor.get(@editor) is @getSelectedTexts()
     unless isSequential
