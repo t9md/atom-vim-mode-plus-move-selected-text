@@ -58,8 +58,8 @@ class MoveSelectedTextUp extends MoveSelectedText
       selections = @editor.getSelectionsOrderedByBufferPosition()
       selections.reverse() if @direction is 'down'
       @editor.transact =>
-        for selection in selections
-          @countTimes =>
+        @countTimes =>
+          for selection in selections
             @mutate(selection)
 
   mutate: (selection) ->
@@ -111,11 +111,30 @@ class MoveSelectedTextUp extends MoveSelectedText
     @swapText(fromRange, toRange)
     swrap(selection).setBufferRange(toRange, {preserveFolds: true, reversed})
 
+  getOverwrittenText: (replacedText) ->
+    unless overwrittenByEditor.has(@editor)
+      overwrittenArea = @editor.getSelections().map (selection) ->
+        _.multiplyString(' ', replacedText.length)
+      overwrittenByEditor.set(@editor, overwrittenArea)
+    overwrittenArea = overwrittenByEditor.get(@editor)
+
+    switch @direction
+      when 'up'
+        overwrittenArea.push(replacedText)
+        overwrittenArea.shift()
+      when 'down'
+        overwrittenArea.unshift(replacedText)
+        overwrittenArea.pop()
+
   swapText: (fromRange, toRange) ->
-    fromText = @editor.getTextInBufferRange(fromRange)
-    toText = @editor.getTextInBufferRange(toRange)
-    @editor.setTextInBufferRange(fromRange, toText)
-    @editor.setTextInBufferRange(toRange, fromText)
+    movingText = @editor.getTextInBufferRange(fromRange)
+    replacedText = @editor.getTextInBufferRange(toRange)
+
+    if @getMoveMethod() is 'overwrite'
+      replacedText = @getOverwrittenText(replacedText)
+
+    @editor.setTextInBufferRange(fromRange, replacedText)
+    @editor.setTextInBufferRange(toRange, movingText)
 
   moveLinewise: (selection) ->
     return unless @isMovable(selection)
@@ -123,10 +142,12 @@ class MoveSelectedTextUp extends MoveSelectedText
     translation = @getRangeTranslationSpec('linewise')
     swrap(selection).translate(translation, {preserveFolds: true})
     rows = swrap(selection).lineTextForBufferRows()
+
     if @getMoveMethod() is 'overwrite'
       @rotateRowsWithOverwrite(rows)
     else
       @rotateRows(rows)
+
     range = selection.insertText(rows.join("\n") + "\n")
     range = range.translate(translation.reverse()...)
     swrap(selection).setBufferRange(range, {preserveFolds: true, reversed})
