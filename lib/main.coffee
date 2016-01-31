@@ -18,14 +18,13 @@ module.exports =
 
   eachEditorElement: (fn) ->
     atom.workspace.getTextEditors().forEach (editor) ->
-      editorElement = getView(editor)
-      fn(editorElement)
+      fn(getView(editor))
 
   activate: ->
     @subscriptions = new CompositeDisposable
 
     @subscribe atom.config.observe MoveMethodConfig, (newValue) =>
-      @eachEditorElement (editorElement) =>
+      @eachEditorElement (editorElement) ->
         editorElement.classList.remove(OverwriteClass)
         if newValue is 'overwrite'
           editorElement.classList.add(OverwriteClass)
