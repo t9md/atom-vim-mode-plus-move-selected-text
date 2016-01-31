@@ -1,6 +1,5 @@
 _ = require 'underscore-plus'
 {CompositeDisposable} = require 'atom'
-# {inspect} = require 'util' # debug purpose
 
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
@@ -46,9 +45,8 @@ class MoveSelectedText extends TransformString
   getSelectedTexts: ->
     @editor.getSelections().map((selection) -> selection.getText()).join('')
 
-  getMoveMethod: ->
-    @_moveMethod ?= atom.config.get('vim-mode-plus-move-selected-text.moveMethod')
-    @_moveMethod
+  isOverwrite: ->
+    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
 
   withUndoJoin: (fn) ->
     unless disposableByEditor.has(@editor)
@@ -84,15 +82,15 @@ class MoveSelectedText extends TransformString
         overwrittenArea.unshift(replacedText)
         overwrittenArea.pop()
       when 'right'
-        [other..., last] = overwrittenArea[@_takenIndex]
-        overwrittenArea[@_takenIndex] = replacedText + other.join('')
+        [rest..., overwritten] = overwrittenArea[@_takenIndex]
+        overwrittenArea[@_takenIndex] = replacedText + rest.join('')
         @_takenIndex++
-        last
+        overwritten
       when 'left'
-        [first, other...] = overwrittenArea[@_takenIndex]
-        overwrittenArea[@_takenIndex] = other.join('') + replacedText
+        [overwritten, rest...] = overwrittenArea[@_takenIndex]
+        overwrittenArea[@_takenIndex] = rest.join('') + replacedText
         @_takenIndex++
-        first
+        overwritten
 
   isLinewise: ->
     switch @vimState.submode
@@ -152,10 +150,7 @@ class MoveSelectedTextUp extends MoveSelectedText
     @complementSpacesToPoint(toRange.end)
     movingText = @editor.getTextInBufferRange(fromRange)
     replacedText = @editor.getTextInBufferRange(toRange)
-
-    if @getMoveMethod() is 'overwrite'
-      replacedText = @getOverwrittenText(replacedText)
-
+    replacedText = @getOverwrittenText(replacedText) if @isOverwrite()
     @editor.setTextInBufferRange(fromRange, replacedText)
     @editor.setTextInBufferRange(toRange, movingText)
 
@@ -188,13 +183,11 @@ class MoveSelectedTextUp extends MoveSelectedText
     switch @direction
       when 'up'
         replacedText = lineTexts.shift()
-        if @getMoveMethod() is 'overwrite'
-          replacedText = @getOverwrittenText(replacedText)
+        replacedText = @getOverwrittenText(replacedText) if @isOverwrite()
         lineTexts.push(replacedText)
       when 'down'
         replacedText = lineTexts.pop()
-        if @getMoveMethod() is 'overwrite'
-          replacedText = @getOverwrittenText(replacedText)
+        replacedText = @getOverwrittenText(replacedText) if @isOverwrite()
         lineTexts.unshift(replacedText)
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
@@ -244,13 +237,11 @@ class MoveSelectedTextRight extends MoveSelectedText
     switch @direction
       when 'right'
         [moving..., replacedText] = text
-        if @getMoveMethod() is 'overwrite'
-          replacedText = @getOverwrittenText(replacedText)
+        replacedText = @getOverwrittenText(replacedText) if @isOverwrite()
         replacedText + moving.join('')
       when 'left'
         [replacedText, moving...] = text
-        if @getMoveMethod() is 'overwrite'
-          replacedText = @getOverwrittenText(replacedText)
+        replacedText = @getOverwrittenText(replacedText) if @isOverwrite()
         moving.join('') + replacedText
 
   getRangeTranslationSpec: ->

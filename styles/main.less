@@ -1,16 +1,11 @@
 @import "ui-variables";
 
-.block-cursor(@visibility: visible) {
-  border: 0;
-  background-color: @background-color-success;
-  visibility: @visibility;
-  opacity: 0.5;
-}
-
-atom-text-editor.vim-mode-plus.visual-mode.is-focused.vim-mode-plus-move-selected-text-overwrite {
-  &::shadow {
+atom-text-editor.vim-mode-plus.visual-mode.is-focused {
+  &.vim-mode-plus-move-selected-text-overwrite::shadow {
     .cursor {
-      .block-cursor;
+      border: 0;
+      background-color: @background-color-success;
+      opacity: 0.5;
     }
   }
 }
