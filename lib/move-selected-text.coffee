@@ -16,6 +16,7 @@ stateByEditor = new Map
 checkPointByEditor = new Map
 disposableByEditor = new Map
 overwrittenByEditor = new Map
+
 # -------------------------
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
@@ -51,11 +52,17 @@ class MoveSelectedText extends TransformString
 
   withUndoJoin: (fn) ->
     unless disposableByEditor.has(@editor)
+      disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) ->
+        if mode is 'visual'
+          stateByEditor.delete(@editor)
+          overwrittenByEditor.delete(@editor)
+
       disposableByEditor.set @editor, @editor.onDidDestroy =>
         checkPointByEditor.delete(@editor)
         stateByEditor.delete(@editor)
         disposableByEditor.delete(@editor)
         overwrittenByEditor.delete(@editor)
+        disposable.dispose()
 
     isSequential = stateByEditor.get(@editor) is @getSelectedTexts()
     unless isSequential
