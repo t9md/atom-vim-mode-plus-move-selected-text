@@ -16,14 +16,19 @@ module.exports =
       default: 'insert'
       enum: ['insert', 'overwrite']
 
+  eachEditorElement: (fn) ->
+    atom.workspace.getTextEditors().forEach (editor) ->
+      editorElement = getView(editor)
+      fn(editorElement)
+
   activate: ->
     @subscriptions = new CompositeDisposable
 
-    @subscribe atom.config.observe MoveMethodConfig, (newValue) ->
-      editorElement = getView(getEditor())
-      editorElement.classList.remove OverwriteClass
-      if newValue is 'overwrite'
-        editorElement.classList.add(OverwriteClass)
+    @subscribe atom.config.observe MoveMethodConfig, (newValue) =>
+      @eachEditorElement (editorElement) =>
+        editorElement.classList.remove(OverwriteClass)
+        if newValue is 'overwrite'
+          editorElement.classList.add(OverwriteClass)
 
     @subscribe atom.commands.add 'atom-text-editor',
       'vim-mode-plus-user:toggle-move-method': ->
@@ -35,8 +40,8 @@ module.exports =
     @subscriptions?.dispose()
     @subscriptions = {}
 
-    atom.workspace.getTextEditors().forEach (editor) ->
-      getView(editor).classList.remove(OverwriteClass)
+    @eachEditorElement (editorElement) ->
+      editorElement.classList.remove(OverwriteClass)
 
   subscribe: (args...) ->
     @subscriptions.add args...
