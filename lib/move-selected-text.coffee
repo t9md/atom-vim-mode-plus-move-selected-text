@@ -1,5 +1,6 @@
 _ = require 'underscore-plus'
 {CompositeDisposable} = require 'atom'
+{inspect} = require 'util' # debug purpose
 
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
@@ -14,6 +15,7 @@ CommandPrefix = 'vim-mode-plus-user'
 stateByEditor = new Map
 checkPointByEditor = new Map
 disposableByEditor = new Map
+overwrittenByEditor = new Map
 # -------------------------
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
@@ -25,16 +27,21 @@ class MoveSelectedText extends TransformString
   getSelectedTexts: ->
     @editor.getSelections().map((selection) -> selection.getText()).join('')
 
+  getMoveMethod: ->
+    atom.config.get('vim-mode-plus-move-selected-text.moveMethod')
+
   withUndoJoin: (fn) ->
     unless disposableByEditor.has(@editor)
       disposableByEditor.set @editor, @editor.onDidDestroy =>
         checkPointByEditor.delete(@editor)
         stateByEditor.delete(@editor)
         disposableByEditor.delete(@editor)
+        overwrittenByEditor.delete(@editor)
 
     isSequential = stateByEditor.get(@editor) is @getSelectedTexts()
     unless isSequential
       checkPointByEditor.set(@editor, @editor.createCheckpoint())
+      overwrittenByEditor.delete(@editor)
     fn()
 
     stateByEditor.set(@editor, @getSelectedTexts())
@@ -63,7 +70,8 @@ class MoveSelectedTextUp extends MoveSelectedText
         if swrap(selection).isSingleRow()
           @moveCharacterwise(selection) if @isMovable(selection)
         else
-          @moveLinewise(selection)
+          swrap(selection).switchToLinewise =>
+            @moveLinewise(selection)
 
   isMovable: (selection) ->
     switch @direction
@@ -115,11 +123,27 @@ class MoveSelectedTextUp extends MoveSelectedText
     translation = @getRangeTranslationSpec('linewise')
     swrap(selection).translate(translation, {preserveFolds: true})
     rows = swrap(selection).lineTextForBufferRows()
-    @rotateRows(rows)
+    if @getMoveMethod() is 'overwrite'
+      @rotateRowsWithOverwrite(rows)
+    else
+      @rotateRows(rows)
     range = selection.insertText(rows.join("\n") + "\n")
     range = range.translate(translation.reverse()...)
     swrap(selection).setBufferRange(range, {preserveFolds: true, reversed})
     @editor.scrollToCursorPosition({center: true})
+
+  rotateRowsWithOverwrite: (rows) ->
+    overwriteRowCount = rows.length - 1
+    if overwrittenByEditor.has(@editor)
+      overwrittenArea = overwrittenByEditor.get(@editor)
+    else
+      overwrittenArea = [1..overwriteRowCount].map -> ''
+    rows.unshift(overwrittenArea...)
+
+    @rotateRows(rows)
+
+    overwrittenArea = rows.splice(0, overwriteRowCount)
+    overwrittenByEditor.set(@editor, overwrittenArea)
 
   rotateRows: (rows) ->
     switch @direction
@@ -152,10 +176,9 @@ class MoveSelectedTextRight extends MoveSelectedText
         else
           @moveLinewise(selection)
 
-  moveLinewise: (selection) ->
-    switch @direction
-      when 'right' then selection.indentSelectedRows()
-      when 'left' then selection.outdentSelectedRows()
+  moveLinewise: (selection) -> switch @direction
+    when 'right' then selection.indentSelectedRows()
+    when 'left' then selection.outdentSelectedRows()
 
   isMovable: (selection) ->
     switch @vimState.submode

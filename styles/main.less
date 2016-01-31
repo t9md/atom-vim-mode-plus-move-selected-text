@@ -1,0 +1,16 @@
+@cursor-color: fadeout(@background-color-error, 20%);
+
+.block-cursor(@visibility: visible) {
+  border: 0;
+  background-color: @cursor-color;
+  visibility: @visibility;
+  opacity: 0.5;
+}
+
+atom-text-editor.vim-mode-plus.visual-mode.is-focused.vim-mode-plus-move-selected-text-overwrite {
+  &::shadow {
+    .cursor {
+      .block-cursor;
+    }
+  }
+}
