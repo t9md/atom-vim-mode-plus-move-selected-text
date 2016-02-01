@@ -12,10 +12,16 @@ TransformString = Base.getClass('Operator')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
 CommandPrefix = 'vim-mode-plus-user'
+
+newState = ->
+  {
+    selectedTexts: null
+    checkpoint: null
+    overwritten: null
+  }
+
 stateByEditor = new Map
-checkPointByEditor = new Map
 disposableByEditor = new Map
-overwrittenByEditor = new Map
 
 # -------------------------
 class MoveSelectedText extends TransformString
@@ -26,7 +32,7 @@ class MoveSelectedText extends TransformString
       selections = @editor.getSelectionsOrderedByBufferPosition()
       topSelection = selections[0]
       selections.reverse() if @direction is 'down'
-      @initOverwrittenByEditor()
+      @initOverwrittenArea()
       @editor.transact =>
         @countTimes =>
           return if (not @isLinewise()) and (not @isMovable(topSelection))
@@ -37,15 +43,16 @@ class MoveSelectedText extends TransformString
             @extendMovingArea(selection)
             @mutate(selection) if @isMovable(selection)
 
-  initOverwrittenByEditor: ->
-    unless overwrittenByEditor.has(@editor)
+  initOverwrittenArea: ->
+    state = stateByEditor.get(@editor)
+    unless state.overwritten?
       if @isLinewise()
         overwrittenArea = @editor.getSelections().map (selection) ->
           _.multiplyString("\n", swrap(selection).getRowCount()-1)
       else
         overwrittenArea = @editor.getSelections().map (selection) ->
           _.multiplyString(' ', selection.getBufferRange().getExtent().column)
-      overwrittenByEditor.set(@editor, overwrittenArea)
+      state.overwritten = overwrittenArea
 
   getSelectedTexts: ->
     @editor.getSelections().map((selection) -> selection.getText()).join("\n")
@@ -54,31 +61,32 @@ class MoveSelectedText extends TransformString
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
 
   withUndoJoin: (fn) ->
+    stateByEditor.set(@editor, newState()) unless stateByEditor.has(@editor)
+
     unless disposableByEditor.has(@editor)
-      disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) ->
+      disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) =>
         if mode is 'visual'
           stateByEditor.delete(@editor)
-          overwrittenByEditor.delete(@editor)
 
       disposableByEditor.set @editor, @editor.onDidDestroy =>
-        checkPointByEditor.delete(@editor)
         stateByEditor.delete(@editor)
-        disposableByEditor.delete(@editor)
-        overwrittenByEditor.delete(@editor)
         disposable.dispose()
 
-    isSequential = stateByEditor.get(@editor) is @getSelectedTexts()
+    state = stateByEditor.get(@editor)
+    isSequential = state.selectedTexts is @getSelectedTexts()
     unless isSequential
-      checkPointByEditor.set(@editor, @editor.createCheckpoint())
-      overwrittenByEditor.delete(@editor)
+      state.checkpoint = @editor.createCheckpoint()
+      state.overwritten = null
+
     fn()
 
-    stateByEditor.set(@editor, @getSelectedTexts())
-    if isSequential and (checkpoint = checkPointByEditor.get(@editor))
-      @editor.groupChangesSinceCheckpoint(checkpoint)
+    state.selectedTexts = @getSelectedTexts()
+    if isSequential
+      @editor.groupChangesSinceCheckpoint(state.checkpoint)
 
   getOverwrittenText: (replacedText) ->
-    overwrittenArea = overwrittenByEditor.get(@editor)[@selectionIndex]
+    state = stateByEditor.get(@editor)
+    overwrittenArea = state.overwritten[@selectionIndex]
     replacedText = switch @direction
       when 'up'
         [overwritten, rest...] = overwrittenArea.split("\n")
@@ -97,7 +105,7 @@ class MoveSelectedText extends TransformString
         overwrittenArea = [replacedText, rest...].join("")
         overwritten
 
-    overwrittenByEditor.get(@editor)[@selectionIndex] = overwrittenArea
+    state.overwritten[@selectionIndex] = overwrittenArea
     replacedText
 
   isLinewise: ->
