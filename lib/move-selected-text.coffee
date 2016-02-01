@@ -24,13 +24,17 @@ class MoveSelectedText extends TransformString
   execute: ->
     @withUndoJoin =>
       selections = @editor.getSelectionsOrderedByBufferPosition()
+      topSelection = selections[0]
       selections.reverse() if @direction is 'down'
       @initOverwrittenByEditor()
       @editor.transact =>
         @countTimes =>
+          return if (not @isLinewise()) and (not @isMovable(topSelection))
+
           for selection, i in selections
             @selectionIndex = i
             @selectionIndex = selections.length - (i + 1) if @direction is 'down'
+            @extendMovingArea(selection)
             @mutate(selection) if @isMovable(selection)
 
   initOverwrittenByEditor: ->
@@ -119,17 +123,17 @@ class MoveSelectedTextUp extends MoveSelectedText
     else
       @moveCharacterwise(selection)
 
+  extendMovingArea: (selection) ->
+    if @direction is 'down'
+      endRow = selection.getBufferRange().end.row
+      if endRow >= getVimLastBufferRow(@editor)
+        eof = @editor.getEofBufferPosition()
+        @editor.setTextInBufferRange([eof, eof], "\n")
+
   isMovable: (selection) ->
     switch @direction
-      when 'up'
-        selection.getBufferRange().start.row isnt 0
-      when 'down'
-        # Extend last buffer line if selection end is last buffer row
-        endRow = selection.getBufferRange().end.row
-        if endRow >= getVimLastBufferRow(@editor)
-          eof = @editor.getEofBufferPosition()
-          @editor.setTextInBufferRange([eof, eof], "\n")
-        true
+      when 'up' then selection.getBufferRange().start.row isnt 0
+      when 'down' then true
 
   # Characterwise
   # -------------------------
@@ -213,18 +217,19 @@ class MoveSelectedTextRight extends MoveSelectedText
       when 'right' then selection.indentSelectedRows()
       when 'left' then selection.outdentSelectedRows()
 
+  extendMovingArea: (selection) ->
+    if not @isLinewise() and @direction is 'right'
+      {start, end} = selection.getBufferRange()
+      if pointIsAtEndOfLine(@editor, end)
+        @editor.setTextInBufferRange([end, end], " ")
+
   isMovable: (selection) ->
     if @isLinewise()
       true
     else
-      {start, end} = selection.getBufferRange()
       switch @direction
-        when 'right'
-          if pointIsAtEndOfLine(@editor, end)
-            @editor.setTextInBufferRange([end, end], " ")
-          true
-        when 'left'
-          start.column isnt 0
+        when 'right' then true
+        when 'left' then selection.getBufferRange().start.column isnt 0
 
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
