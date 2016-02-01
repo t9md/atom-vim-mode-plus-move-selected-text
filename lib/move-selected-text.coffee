@@ -1,5 +1,6 @@
 _ = require 'underscore-plus'
 {CompositeDisposable} = require 'atom'
+{inspect} = require 'util'
 
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
@@ -29,17 +30,17 @@ class MoveSelectedText extends TransformString
         @countTimes =>
           for selection, i in selections
             @selectionIndex = i
+            @selectionIndex = selections.length - (i + 1) if @direction is 'down'
             @mutate(selection) if @isMovable(selection)
 
   initOverwrittenByEditor: ->
     unless overwrittenByEditor.has(@editor)
       if @isLinewise()
-        rowCount = swrap(@editor.getLastSelection()).getRowCount()
-        overwrittenArea = [1..rowCount].map -> ''
-      else
-        width = @editor.getLastSelection().getBufferRange().getExtent().column
         overwrittenArea = @editor.getSelections().map (selection) ->
-          _.multiplyString(' ', width)
+          _.multiplyString("\n", swrap(selection).getRowCount()-1)
+      else
+        overwrittenArea = @editor.getSelections().map (selection) ->
+          _.multiplyString(' ', selection.getBufferRange().getExtent().column)
       overwrittenByEditor.set(@editor, overwrittenArea)
 
   getSelectedTexts: ->
@@ -73,22 +74,27 @@ class MoveSelectedText extends TransformString
       @editor.groupChangesSinceCheckpoint(checkpoint)
 
   getOverwrittenText: (replacedText) ->
-    overwrittenArea = overwrittenByEditor.get(@editor)
-    switch @direction
+    overwrittenArea = overwrittenByEditor.get(@editor)[@selectionIndex]
+    replacedText = switch @direction
       when 'up'
-        overwrittenArea.push(replacedText)
-        overwrittenArea.shift()
+        [overwritten, rest...] = overwrittenArea.split("\n")
+        overwrittenArea = [rest..., replacedText].join("\n")
+        overwritten
       when 'down'
-        overwrittenArea.unshift(replacedText)
-        overwrittenArea.pop()
+        [rest..., overwritten] = overwrittenArea.split("\n")
+        overwrittenArea = [replacedText, rest...].join("\n")
+        overwritten
       when 'right'
-        [rest..., overwritten] = overwrittenArea[@selectionIndex]
-        overwrittenArea[@selectionIndex] = replacedText + rest.join('')
+        [overwritten, rest...] = overwrittenArea
+        overwrittenArea = [rest..., replacedText].join("")
         overwritten
       when 'left'
-        [overwritten, rest...] = overwrittenArea[@selectionIndex]
-        overwrittenArea[@selectionIndex] = rest.join('') + replacedText
+        [rest..., overwritten] = overwrittenArea
+        overwrittenArea = [replacedText, rest...].join("")
         overwritten
+
+    overwrittenByEditor.get(@editor)[@selectionIndex] = overwrittenArea
+    replacedText
 
   isLinewise: ->
     switch @vimState.submode
