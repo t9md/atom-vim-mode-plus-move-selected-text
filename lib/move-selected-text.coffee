@@ -27,12 +27,28 @@ disposableByEditor = new Map
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
 
+  initialize: ->
+    stateByEditor.set(@editor, newState()) unless stateByEditor.has(@editor)
+    unless disposableByEditor.has(@editor)
+      disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) =>
+        if mode is 'visual'
+          stateByEditor.delete(@editor)
+
+      disposableByEditor.set @editor, @editor.onDidDestroy =>
+        stateByEditor.delete(@editor)
+        disposable.dispose()
+
+  getSelectedTexts: ->
+    @editor.getSelections().map((selection) -> selection.getText()).join("\n")
+
+  isOverwrite: ->
+    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+
   execute: ->
     @withUndoJoin =>
       selections = @editor.getSelectionsOrderedByBufferPosition()
       topSelection = selections[0]
       selections.reverse() if @direction is 'down'
-      @initOverwrittenArea()
       @editor.transact =>
         @countTimes =>
           return if (not @isLinewise()) and (not @isMovable(topSelection))
@@ -43,40 +59,24 @@ class MoveSelectedText extends TransformString
             @extendMovingArea(selection)
             @mutate(selection) if @isMovable(selection)
 
-  initOverwrittenArea: ->
-    state = stateByEditor.get(@editor)
-    unless state.overwritten?
-      if @isLinewise()
-        overwrittenArea = @editor.getSelections().map (selection) ->
-          _.multiplyString("\n", swrap(selection).getRowCount()-1)
-      else
-        overwrittenArea = @editor.getSelections().map (selection) ->
-          _.multiplyString(' ', selection.getBufferRange().getExtent().column)
-      state.overwritten = overwrittenArea
-
-  getSelectedTexts: ->
-    @editor.getSelections().map((selection) -> selection.getText()).join("\n")
-
-  isOverwrite: ->
-    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+  getInitialOverwrittenArea: ->
+    selections = @editor.getSelections()
+    if @isLinewise()
+      selections.map (selection) ->
+        _.multiplyString("\n", swrap(selection).getRowCount()-1)
+    else
+      selections.map (selection) ->
+        _.multiplyString(' ', selection.getBufferRange().getExtent().column)
 
   withUndoJoin: (fn) ->
-    stateByEditor.set(@editor, newState()) unless stateByEditor.has(@editor)
-
-    unless disposableByEditor.has(@editor)
-      disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) =>
-        if mode is 'visual'
-          stateByEditor.delete(@editor)
-
-      disposableByEditor.set @editor, @editor.onDidDestroy =>
-        stateByEditor.delete(@editor)
-        disposable.dispose()
-
     state = stateByEditor.get(@editor)
     isSequential = state.selectedTexts is @getSelectedTexts()
     unless isSequential
       state.checkpoint = @editor.createCheckpoint()
       state.overwritten = null
+
+    unless state.overwritten?
+      state.overwritten = @getInitialOverwrittenArea()
 
     fn()
 
