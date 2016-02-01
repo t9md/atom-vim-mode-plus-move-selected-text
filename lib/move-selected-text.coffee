@@ -11,14 +11,10 @@ TransformString = Base.getClass('Operator')
 {pointIsAtEndOfLine, getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
-CommandPrefix = 'vim-mode-plus-user'
-
 newState = ->
-  {
-    selectedTexts: null
-    checkpoint: null
-    overwritten: null
-  }
+  selectedTexts: null
+  checkpoint: null
+  overwritten: null
 
 stateByEditor = new Map
 disposableByEditor = new Map
@@ -26,6 +22,7 @@ disposableByEditor = new Map
 # -------------------------
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
+  @commandPrefix: 'vim-mode-plus-user'
 
   initialize: ->
     stateByEditor.set(@editor, newState()) unless stateByEditor.has(@editor)
@@ -63,7 +60,7 @@ class MoveSelectedText extends TransformString
     selections = @editor.getSelections()
     if @isLinewise()
       selections.map (selection) ->
-        _.multiplyString("\n", swrap(selection).getRowCount()-1)
+        swrap(selection).getRows().map(-> '').join("\n")
     else
       selections.map (selection) ->
         _.multiplyString(' ', selection.getBufferRange().getExtent().column)
@@ -117,7 +114,6 @@ class MoveSelectedText extends TransformString
           not swrap(selection).isSingleRow()
 
 class MoveSelectedTextUp extends MoveSelectedText
-  @commandPrefix: CommandPrefix
   direction: 'up'
   flashTarget: false
 
@@ -181,7 +177,7 @@ class MoveSelectedTextUp extends MoveSelectedText
       when 'up' then [[-1, 0], [0, 0]]
       when 'down' then [[0, 0], [1, 0]]
 
-    swrap(selection).translate(translation)
+    swrap(selection).translate(translation...)
 
     lineTexts = swrap(selection).lineTextForBufferRows()
     @rotateRows(lineTexts)
@@ -210,7 +206,6 @@ class MoveSelectedTextDown extends MoveSelectedTextUp
 
 # -------------------------
 class MoveSelectedTextRight extends MoveSelectedText
-  @commandPrefix: CommandPrefix
   direction: 'right'
   flashTarget: false
 
@@ -246,7 +241,7 @@ class MoveSelectedTextRight extends MoveSelectedText
       when 'right' then [[0, 0], [0, +1]]
       when 'left' then [[0, -1], [0, 0]]
 
-    swrap(selection).translate(translation)
+    swrap(selection).translate(translation...)
     newText = @rotate(selection.getText())
     range = selection.insertText(newText)
     range = range.translate(translation.reverse()...)
