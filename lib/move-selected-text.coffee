@@ -27,8 +27,8 @@ class MoveSelectedText extends TransformString
       @initOverwrittenByEditor()
       @editor.transact =>
         @countTimes =>
-          @_takenIndex = 0
-          for selection in selections
+          for selection, i in selections
+            @selectionIndex = i
             @mutate(selection) if @isMovable(selection)
 
   initOverwrittenByEditor: ->
@@ -43,7 +43,7 @@ class MoveSelectedText extends TransformString
       overwrittenByEditor.set(@editor, overwrittenArea)
 
   getSelectedTexts: ->
-    @editor.getSelections().map((selection) -> selection.getText()).join('')
+    @editor.getSelections().map((selection) -> selection.getText()).join("\n")
 
   isOverwrite: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
@@ -82,19 +82,18 @@ class MoveSelectedText extends TransformString
         overwrittenArea.unshift(replacedText)
         overwrittenArea.pop()
       when 'right'
-        [rest..., overwritten] = overwrittenArea[@_takenIndex]
-        overwrittenArea[@_takenIndex] = replacedText + rest.join('')
-        @_takenIndex++
+        [rest..., overwritten] = overwrittenArea[@selectionIndex]
+        overwrittenArea[@selectionIndex] = replacedText + rest.join('')
         overwritten
       when 'left'
-        [overwritten, rest...] = overwrittenArea[@_takenIndex]
-        overwrittenArea[@_takenIndex] = rest.join('') + replacedText
-        @_takenIndex++
+        [overwritten, rest...] = overwrittenArea[@selectionIndex]
+        overwrittenArea[@selectionIndex] = rest.join('') + replacedText
         overwritten
 
   isLinewise: ->
     switch @vimState.submode
-      when 'linewise' then true
+      when 'linewise'
+        true
       when 'characterwise', 'blockwise'
         @editor.getSelections().some (selection) ->
           not swrap(selection).isSingleRow()
@@ -126,21 +125,15 @@ class MoveSelectedTextUp extends MoveSelectedText
           @editor.setTextInBufferRange([eof, eof], "\n")
         true
 
-  getRangeTranslationSpec: (wise) ->
-    if wise is 'linewise'
-      switch @direction
-        when 'up' then [[-1, 0], [0, 0]]
-        when 'down' then [[0, 0], [1, 0]]
-    else if 'characterwis'
-      switch @direction
-        when 'up' then [[-1, 0], [-1, 0]]
-        when 'down' then [[1, 0], [1, 0]]
-
   # Characterwise
   # -------------------------
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
-    translation = @getRangeTranslationSpec('characterwise')
+
+    translation = switch @direction
+      when 'up' then [[-1, 0], [-1, 0]]
+      when 'down' then [[1, 0], [1, 0]]
+
     fromRange = selection.getBufferRange()
     toRange = fromRange.translate(translation...)
     @swapTextInRange(fromRange, toRange)
@@ -166,7 +159,10 @@ class MoveSelectedTextUp extends MoveSelectedText
     reversed = selection.isReversed()
 
     # Pre mutate
-    translation = @getRangeTranslationSpec('linewise')
+    translation = switch @direction
+      when 'up' then [[-1, 0], [0, 0]]
+      when 'down' then [[0, 0], [1, 0]]
+
     swrap(selection).translate(translation)
 
     lineTexts = swrap(selection).lineTextForBufferRows()
@@ -226,7 +222,11 @@ class MoveSelectedTextRight extends MoveSelectedText
 
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
-    translation = @getRangeTranslationSpec()
+
+    translation = switch @direction
+      when 'right' then [[0, 0], [0, +1]]
+      when 'left' then [[0, -1], [0, 0]]
+
     swrap(selection).translate(translation)
     newText = @rotate(selection.getText())
     range = selection.insertText(newText)
@@ -243,11 +243,6 @@ class MoveSelectedTextRight extends MoveSelectedText
         [replacedText, moving...] = text
         replacedText = @getOverwrittenText(replacedText) if @isOverwrite()
         moving.join('') + replacedText
-
-  getRangeTranslationSpec: ->
-    switch @direction
-      when 'right' then [[0, 0], [0, +1]]
-      when 'left' then [[0, -1], [0, 0]]
 
 class MoveSelectedTextLeft extends MoveSelectedTextRight
   direction: 'left'
