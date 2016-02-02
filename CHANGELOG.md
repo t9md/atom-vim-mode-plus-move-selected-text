@@ -1,3 +1,7 @@
+## 0.3.0
+- New: Support overwrite mode.
+- Improve: Lots of bug fix, refactoring.
+
 ## 0.2.0 - Improve
 - Improve: blockwise movement.
 
