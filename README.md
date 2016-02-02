@@ -2,7 +2,9 @@
 
 Move selected text like object.  
 
-This iso perator plugin for [vim-mode-plus](https://atom.io/packages/vim-mode-plus).  
+
+This is operator plugin for [vim-mode-plus](https://atom.io/packages/vim-mode-plus).  
+Require [vim-mode-plus](https://atom.io/packages/vim-mode-plus) v0.19.1 or later.  
 
 - Works only in visual mode.  
 - Support all submode(linewise, characterwise, blockwise).
@@ -12,7 +14,7 @@ This iso perator plugin for [vim-mode-plus](https://atom.io/packages/vim-mode-pl
 
 This package is feature migration from my [vim-textmanip](https://github.com/t9md/vim-textmanip) plugin for pure Vim.  
 
-![](https://raw.githubusercontent.com/t9md/t9md/1df78bf22bc94440cd47e381dc6c6c6ad1c2db33/img/vim-mode-plus/move-selected-text.gif)
+![](https://raw.githubusercontent.com/t9md/t9md/842444a1482afe4bb789dd602c6be9ba40f71073/img/vim-mode-plus/move-selected-text.gif)
 
 ## TODO
 
