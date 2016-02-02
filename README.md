@@ -5,7 +5,7 @@ This is operator plugin for [vim-mode-plus](https://atom.io/packages/vim-mode-pl
 Move selected text like object.  
 Works only in visual mode.  
 Support all submode(linewise, characterwise, blockwise).
-You can switch `overwrite` mode via `vim-mode-plus-user:toggle-move-method` command.  
+You can switch `overwrite` mode via `vim-mode-plus-user:toggle-overwrite` command.  
 
 This package is feature migration from my [vim-textmanip](https://github.com/t9md/vim-textmanip) plugin for pure Vim.  
 
