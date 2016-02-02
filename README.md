@@ -1,11 +1,14 @@
 # vim-mode-plus-move-selected-text
 
-This is operator plugin for [vim-mode-plus](https://atom.io/packages/vim-mode-plus).  
-
 Move selected text like object.  
-Works only in visual mode.  
-Support all submode(linewise, characterwise, blockwise).
-You can switch `overwrite` mode via `vim-mode-plus-user:toggle-overwrite` command.  
+
+This iso perator plugin for [vim-mode-plus](https://atom.io/packages/vim-mode-plus).  
+
+- Works only in visual mode.  
+- Support all submode(linewise, characterwise, blockwise).
+- Can revert consecutive movement with single undo.
+- Can switch `overwrite` mode via `vim-mode-plus-user:toggle-overwrite` command.  
+- Green cursor color indicate your are now in `overwrite` mode.
 
 This package is feature migration from my [vim-textmanip](https://github.com/t9md/vim-textmanip) plugin for pure Vim.  
 
