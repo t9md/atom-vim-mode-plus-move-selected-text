@@ -198,9 +198,9 @@ class MoveSelectedTextUp extends MoveSelectedText
 
     # Swap text from fromRange to toRange
     @complementSpacesToPoint(toRange.end)
-    movingetgText = @editor.TextInBufferRange(fromRange)
-    replar.gcedText = @editoetTextInBufferRange(toRange)
-    replaerwcedText = @getOvrittenForSelection(selection, replacedText) if @isOverwrite()
+    movingText = @editor.getTextInBufferRange(fromRange)
+    replacedText = @editor.getTextInBufferRange(toRange)
+    replacedText = @getOverwrittenForSelection(selection, replacedText) if @isOverwrite()
     @editor.setTextInBufferRange(fromRange, replacedText)
     @editor.setTextInBufferRange(toRange, movingText)
 
