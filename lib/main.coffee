@@ -1,11 +1,5 @@
 {CompositeDisposable} = require 'atom'
 
-getEditor = ->
-  atom.workspace.getActiveTextEditor()
-
-getView = (model) ->
-  atom.views.getView(model)
-
 OverwriteConfig = 'vim-mode-plus-move-selected-text.overwrite'
 OverwriteClass = 'vim-mode-plus-move-selected-text-overwrite'
 
@@ -18,19 +12,19 @@ module.exports =
 
   eachEditorElement: (fn) ->
     atom.workspace.getTextEditors().forEach (editor) ->
-      fn(getView(editor))
+      fn(atom.views.getView(editor))
 
   activate: ->
     @subscriptions = new CompositeDisposable
 
     @subscribe atom.config.observe OverwriteConfig, (newValue) =>
       @eachEditorElement (editorElement) ->
-        editorElement.classList.remove(OverwriteClass)
-        editorElement.classList.add(OverwriteClass) if newValue
+        editorElement.classList.toggle(OverwriteClass, newValue)
 
     @subscribe atom.commands.add 'atom-text-editor',
       'vim-mode-plus-user:toggle-overwrite': ->
-        atom.config.set(OverwriteConfig, not atom.config.get(OverwriteConfig))
+        newValue = not atom.config.get(OverwriteConfig)
+        atom.config.set(OverwriteConfig, newValue)
 
   deactivate: ->
     @subscriptions?.dispose()
