@@ -17,6 +17,10 @@ module.exports =
   activate: ->
     @subscriptions = new CompositeDisposable
 
+    @subscribe atom.workspace.observeTextEditors (editor) ->
+      editorElement = atom.views.getView(editor)
+      editorElement.classList.toggle(OverwriteClass, atom.config.get(OverwriteConfig))
+
     @subscribe atom.config.observe OverwriteConfig, (newValue) =>
       @eachEditorElement (editorElement) ->
         editorElement.classList.toggle(OverwriteClass, newValue)

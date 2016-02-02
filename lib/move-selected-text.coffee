@@ -56,7 +56,6 @@ newState = ->
 stateByEditor = new Map
 disposableByEditor = new Map
 
-
 # -------------------------
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
