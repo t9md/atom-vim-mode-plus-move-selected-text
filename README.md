@@ -17,8 +17,7 @@ This package is feature migration from my [vim-textmanip](https://github.com/t9m
 ## TODO
 
 - [ ] Write spec
-- [ ] Work as screenPosition wise for characterwise move.
-- [ ] Performance improvement
+- [ ] Work as screenPosition wise for characterwise move to support soft-wrapped buffer.
 - [ ] Duplicate above/below with overwrite mode support
 - [x] blockwise support
 - [x] Support count

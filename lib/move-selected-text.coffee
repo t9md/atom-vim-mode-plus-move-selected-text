@@ -1,7 +1,3 @@
-_ = require 'underscore-plus'
-{CompositeDisposable} = require 'atom'
-{inspect} = require 'util'
-
 # Moving strategy
 # -------------------------
 # Two wise. correspoinding submode of visual-mode is below
@@ -39,6 +35,9 @@ _ = require 'underscore-plus'
 #    - Linewise: outdent line
 #    - Characterwise: rotate charater in single-row selection.
 
+_ = require 'underscore-plus'
+{CompositeDisposable} = require 'atom'
+{inspect} = require 'util'
 
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
@@ -154,20 +153,21 @@ class MoveSelectedText extends TransformString
     if isSequential
       @editor.groupChangesSinceCheckpoint(state.checkpoint)
 
+  # Used by
+  # - up: linewise, characterwise
+  # - down: linewise, characterwise
+  # - right: characterwise
+  # - left: characterwise
   getOverwrittenForSelection: (selection, disappearing) ->
     {overwrittenBySelection} = stateByEditor.get(@editor)
     overwrittenArea = overwrittenBySelection.get(selection)
 
-    # up and down is both for characterwise and linewise
-    # left and right is only for characterwise
     overwritten = switch @direction
       when 'up'
-        # console.log 'called! up', inspect(overwrittenArea)
         [appearing, covered...] = overwrittenArea.split("\n")
         overwrittenArea = [covered..., disappearing].join("\n")
         appearing
       when 'down'
-        # console.log 'called! down', inspect(overwrittenArea)
         [covered..., appearing] = overwrittenArea.split("\n")
         overwrittenArea = [disappearing, covered...].join("\n")
         appearing
@@ -183,6 +183,11 @@ class MoveSelectedText extends TransformString
     overwrittenBySelection.set(selection, overwrittenArea)
     overwritten
 
+  # Used by
+  # - up: linewise
+  # - down: linewise
+  # - right: characterwise
+  # - left: characterwise
   rotateTextForSelection: (selection) ->
     reversed = selection.isReversed()
     # Pre mutate
@@ -195,13 +200,11 @@ class MoveSelectedText extends TransformString
     range = selection.getBufferRange().translate(translation...)
     selection.setBufferRange(range)
 
-    # up and down is only for linewise
-    # left and right is only for characterwise
     text = switch @direction
       when 'up', 'down' then swrap(selection).lineTextForBufferRows()
       when 'right', 'left' then selection.getText().split('')
 
-    rotated = @rotateText(text, selection, @isOverwrite())
+    rotated = @rotateText(text, selection)
     newText = if @isLinewise()
       rotated.join("\n") + "\n"
     else
@@ -211,19 +214,23 @@ class MoveSelectedText extends TransformString
     range = range.translate(translation.reverse()...)
     selection.setBufferRange(range, {reversed})
 
-  # Return [rotatedText, overwrittenText]
-  rotateText: (text, selection, considerOverwrite=false) ->
-    # up and down is only for linewise
-    # left and right is only for characterwise
+  # Used by
+  # - up: linewise
+  # - down: linewise
+  # - right: characterwise
+  # - left: characterwise
+  rotateText: (text, selection) ->
     switch @direction
       when 'up', 'left'
-        [overwritten, rest...] = text
-        overwritten = @getOverwrittenForSelection(selection, overwritten) if considerOverwrite
-        [rest..., overwritten]
+        overwritten = text.shift()
+        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
+        text.push(overwritten)
+        text
       when 'down', 'right'
-        [rest..., overwritten] = text
-        overwritten = @getOverwrittenForSelection(selection, overwritten) if considerOverwrite
-        [overwritten, rest...]
+        overwritten = text.pop()
+        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
+        text.unshift(overwritten)
+        text
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
