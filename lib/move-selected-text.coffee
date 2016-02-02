@@ -56,6 +56,7 @@ newState = ->
 stateByEditor = new Map
 disposableByEditor = new Map
 
+
 # -------------------------
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
@@ -131,9 +132,9 @@ class MoveSelectedText extends TransformString
     @editor.getSelections().forEach (selection) ->
       data =
         if isLinewise
-          swrap(selection).getRows().map(-> '').join("\n")
+          swrap(selection).getRows().map(-> '')
         else
-          _.multiplyString(' ', selection.getBufferRange().getExtent().column)
+          [_.multiplyString(' ', selection.getBufferRange().getExtent().column)]
       overwrittenBySelection.set(selection, data)
     overwrittenBySelection
 
@@ -160,28 +161,26 @@ class MoveSelectedText extends TransformString
   # - left: characterwise
   getOverwrittenForSelection: (selection, disappearing) ->
     {overwrittenBySelection} = stateByEditor.get(@editor)
+    # overwrittenArea must mutated in-place.
     overwrittenArea = overwrittenBySelection.get(selection)
 
-    overwritten = switch @direction
+    switch @direction
       when 'up'
-        [appearing, covered...] = overwrittenArea.split("\n")
-        overwrittenArea = [covered..., disappearing].join("\n")
-        appearing
+        overwrittenArea.push(disappearing)
+        overwrittenArea.shift()
       when 'down'
-        [covered..., appearing] = overwrittenArea.split("\n")
-        overwrittenArea = [disappearing, covered...].join("\n")
-        appearing
+        overwrittenArea.unshift(disappearing)
+        overwrittenArea.pop()
       when 'left'
-        [covered..., appearing] = overwrittenArea
-        overwrittenArea = [disappearing, covered...].join("")
+        characters = overwrittenArea[0].split('')
+        appearing = characters.pop()
+        overwrittenArea.splice(0, Infinity, disappearing + characters.join(""))
         appearing
       when 'right'
-        [appearing, covered...] = overwrittenArea
-        overwrittenArea = [covered..., disappearing].join("")
+        characters = overwrittenArea[0].split('')
+        appearing = characters.shift()
+        overwrittenArea.splice(0, Infinity, characters.join("") + disappearing)
         appearing
-
-    overwrittenBySelection.set(selection, overwrittenArea)
-    overwritten
 
   # Used by
   # - up: linewise
@@ -204,11 +203,10 @@ class MoveSelectedText extends TransformString
       when 'up', 'down' then swrap(selection).lineTextForBufferRows()
       when 'right', 'left' then selection.getText().split('')
 
-    rotated = @rotateText(text, selection)
     newText = if @isLinewise()
-      rotated.join("\n") + "\n"
+      @rotateText(text, selection).join("\n") + "\n"
     else
-      rotated.join('')
+      @rotateText(text, selection).join("")
 
     range = selection.insertText(newText)
     range = range.translate(translation.reverse()...)
