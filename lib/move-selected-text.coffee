@@ -51,7 +51,6 @@ class MoveSelectedText extends TransformString
         @countTimes =>
           return if (not @isLinewise()) and (not @isMovable(topSelection))
           for selection in selections
-            @extendMovingArea(selection)
             @mutate(selection) if @isMovable(selection)
 
   getOverwrittenBySelection: ->
@@ -72,7 +71,7 @@ class MoveSelectedText extends TransformString
     isSequential = state.selectedTexts is @getSelectedTexts()
     unless isSequential
       state.checkpoint = @editor.createCheckpoint()
-      state.overwritten = null
+      state.overwrittenBySelection = null
 
     unless state.overwrittenBySelection?
       state.overwrittenBySelection = @getOverwrittenBySelection()
@@ -116,17 +115,70 @@ class MoveSelectedText extends TransformString
         @editor.getSelections().some (selection) ->
           not swrap(selection).isSingleRow()
 
+  isMovable: (selection) ->
+    switch @direction
+      when 'down', 'right'
+        true
+      when 'up'
+        selection.getBufferRange().start.row isnt 0
+      when 'left'
+        if @isLinewise()
+          true
+        else
+          selection.getBufferRange().start.column isnt 0
+
+  rotateTexts: (selection) ->
+    reversed = selection.isReversed()
+    # Pre mutate
+    translation = switch @direction
+      when 'up' then [[-1, 0], [0, 0]]
+      when 'down' then [[0, 0], [1, 0]]
+      when 'right' then [[0, 0], [0, +1]]
+      when 'left' then [[0, -1], [0, 0]]
+
+    swrap(selection).translate(translation...)
+    range = selection.insertText(@getNewText(selection))
+
+    # Post mutate
+    range = range.translate(translation.reverse()...)
+    selection.setBufferRange(range, {reversed})
+
+  getNewText: (selection) ->
+    # 'up', 'down': rotate row
+    # 'right', 'left': rotate column
+    switch @direction
+      when 'up'
+        [overwritten, rest...] = swrap(selection).lineTextForBufferRows()
+        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
+        [rest..., overwritten].join("\n") + "\n"
+      when 'down'
+        [rest..., overwritten] = swrap(selection).lineTextForBufferRows()
+        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
+        [overwritten, rest...].join("\n") + "\n"
+      when 'right' # rotate column
+        [rest..., overwritten] = selection.getText()
+        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
+        [overwritten, rest...].join('')
+      when 'left' # rotate column
+        [overwritten, rest...] = selection.getText()
+        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
+        [rest..., overwritten].join('')
+
+
+
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
   flashTarget: false
 
   mutate: (selection) ->
+    @extendMovingArea(selection)
     if @isLinewise()
       if @vimState.submode is 'linewise'
-        @moveLinewise(selection)
+        @rotateTexts(selection)
       else
         swrap(selection).switchToLinewise =>
-          @moveLinewise(selection)
+          @rotateTexts(selection)
+      @editor.scrollToCursorPosition({center: true})
     else
       @moveCharacterwise(selection)
 
@@ -137,16 +189,10 @@ class MoveSelectedTextUp extends MoveSelectedText
         eof = @editor.getEofBufferPosition()
         @editor.setTextInBufferRange([eof, eof], "\n")
 
-  isMovable: (selection) ->
-    switch @direction
-      when 'up' then selection.getBufferRange().start.row isnt 0
-      when 'down' then true
-
   # Characterwise
   # -------------------------
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
-
     # Pre mutate
     translation = switch @direction
       when 'up' then [[-1, 0], [-1, 0]]
@@ -171,38 +217,6 @@ class MoveSelectedTextUp extends MoveSelectedText
       spaces = _.multiplyString(' ', fillCount)
       @editor.setTextInBufferRange([eol, eol], spaces)
 
-  # Linewise
-  # -------------------------
-  moveLinewise: (selection) ->
-    reversed = selection.isReversed()
-
-    # Pre mutate
-    translation = switch @direction
-      when 'up' then [[-1, 0], [0, 0]]
-      when 'down' then [[0, 0], [1, 0]]
-
-    swrap(selection).translate(translation...)
-    range = selection.insertText(@getNewText(selection))
-
-    # Post mutate
-    range = range.translate(translation.reverse()...)
-    selection.setBufferRange(range, {reversed})
-    @editor.scrollToCursorPosition({center: true})
-
-  getNewText: (selection) ->
-    # Rotate row
-    lineTexts = swrap(selection).lineTextForBufferRows()
-    switch @direction
-      when 'up'
-        replacedText = lineTexts.shift()
-        replacedText = @getOverwrittenForSelection(selection, replacedText) if @isOverwrite()
-        lineTexts.push(replacedText)
-      when 'down'
-        replacedText = lineTexts.pop()
-        replacedText = @getOverwrittenForSelection(selection, replacedText) if @isOverwrite()
-        lineTexts.unshift(replacedText)
-    lineTexts.join("\n") + "\n"
-
 class MoveSelectedTextDown extends MoveSelectedTextUp
   @extend()
   direction: 'down'
@@ -214,57 +228,18 @@ class MoveSelectedTextRight extends MoveSelectedText
 
   mutate: (selection) ->
     if @isLinewise()
-      @moveLinewise(selection)
-    else
-      @moveCharacterwise(selection)
-
-  moveLinewise: (selection) ->
-    switch @direction
-      when 'right' then selection.indentSelectedRows()
-      when 'left' then selection.outdentSelectedRows()
-
-  extendMovingArea: (selection) ->
-    if not @isLinewise() and @direction is 'right'
-      {start, end} = selection.getBufferRange()
-      if pointIsAtEndOfLine(@editor, end)
-        @editor.setTextInBufferRange([end, end], " ")
-
-  isMovable: (selection) ->
-    if @isLinewise()
-      true
-    else
       switch @direction
-        when 'right' then true
-        when 'left' then selection.getBufferRange().start.column isnt 0
+        when 'right' then selection.indentSelectedRows()
+        when 'left' then selection.outdentSelectedRows()
+    else
+      if @direction is 'right'
+        # complement space if EOL
+        point = selection.getBufferRange().end
+        if pointIsAtEndOfLine(@editor, point)
+          @editor.setTextInBufferRange([point, point], " ")
 
-  moveCharacterwise: (selection) ->
-    reversed = selection.isReversed()
-
-    # Pre mutate
-    translation = switch @direction
-      when 'right' then [[0, 0], [0, +1]]
-      when 'left' then [[0, -1], [0, 0]]
-
-    swrap(selection).translate(translation...)
-    range = selection.insertText(@getNewText(selection))
-
-    # Post mutate
-    range = range.translate(translation.reverse()...)
-    selection.setBufferRange(range, {reversed})
-    @editor.scrollToCursorPosition({center: true})
-
-  getNewText: (selection) ->
-    # Rotate column
-    text = selection.getText()
-    switch @direction
-      when 'right'
-        [moving..., replacedText] = text
-        replacedText = @getOverwrittenForSelection(selection, replacedText) if @isOverwrite()
-        replacedText + moving.join('')
-      when 'left'
-        [replacedText, moving...] = text
-        replacedText = @getOverwrittenForSelection(selection, replacedText) if @isOverwrite()
-        moving.join('') + replacedText
+      @rotateTexts(selection)
+      @editor.scrollToCursorPosition({center: true})
 
 class MoveSelectedTextLeft extends MoveSelectedTextRight
   direction: 'left'
