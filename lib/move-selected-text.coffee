@@ -136,58 +136,51 @@ class MoveSelectedText extends TransformString
       when 'right' then [[0, 0], [0, +1]]
       when 'left' then [[0, -1], [0, 0]]
 
-    swrap(selection).translate(translation...)
-    range = selection.insertText(@getNewText(selection))
+    range = selection.getBufferRange().translate(translation...)
+    selection.setBufferRange(range)
 
-    # Post mutate
+    newText = switch @direction
+      when 'up', 'down' # rotate row
+        text = swrap(selection).lineTextForBufferRows()
+        @rotateText(text, selection).join("\n") + "\n"
+      when 'right', 'left' # rotate column
+        text = selection.getText()
+        @rotateText(text, selection).join('')
+
+    range = selection.insertText(newText)
     range = range.translate(translation.reverse()...)
     selection.setBufferRange(range, {reversed})
 
-  getNewText: (selection) ->
-    # 'up', 'down': rotate row
-    # 'right', 'left': rotate column
+  rotateText: (text, selection) ->
     switch @direction
-      when 'up'
-        [overwritten, rest...] = swrap(selection).lineTextForBufferRows()
+      when 'up', 'left'
+        [overwritten, rest...] = text
         overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
-        [rest..., overwritten].join("\n") + "\n"
-      when 'down'
-        [rest..., overwritten] = swrap(selection).lineTextForBufferRows()
+        [rest..., overwritten]
+      when 'down', 'right'
+        [rest..., overwritten] = text
         overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
-        [overwritten, rest...].join("\n") + "\n"
-      when 'right' # rotate column
-        [rest..., overwritten] = selection.getText()
-        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
-        [overwritten, rest...].join('')
-      when 'left' # rotate column
-        [overwritten, rest...] = selection.getText()
-        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
-        [rest..., overwritten].join('')
-
-
+        [overwritten, rest...]
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
   flashTarget: false
 
   mutate: (selection) ->
-    @extendMovingArea(selection)
-    if @isLinewise()
-      if @vimState.submode is 'linewise'
-        @rotateTexts(selection)
-      else
-        swrap(selection).switchToLinewise =>
-          @rotateTexts(selection)
-      @editor.scrollToCursorPosition({center: true})
-    else
-      @moveCharacterwise(selection)
-
-  extendMovingArea: (selection) ->
     if @direction is 'down'
       endRow = selection.getBufferRange().end.row
       if endRow >= getVimLastBufferRow(@editor)
         eof = @editor.getEofBufferPosition()
         @editor.setTextInBufferRange([eof, eof], "\n")
+
+    if @isLinewise()
+      if @vimState.submode is 'linewise'
+        @rotateTexts(selection)
+      else
+        swrap(selection).switchToLinewise => @rotateTexts(selection)
+      @editor.scrollToCursorPosition({center: true})
+    else
+      @moveCharacterwise(selection)
 
   # Characterwise
   # -------------------------
