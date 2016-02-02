@@ -2,6 +2,44 @@ _ = require 'underscore-plus'
 {CompositeDisposable} = require 'atom'
 {inspect} = require 'util'
 
+# Moving strategy
+# -------------------------
+# Two wise. correspoinding submode of visual-mode is below
+#  - Linewise: linewise, characterwise(in case some selection is multi-row)
+#  - Characterwise: characterwise(in case all selection is single-row), blockwise
+#
+# Four direction
+#   ['up', 'down', 'right', 'left']
+#
+# Movability
+#  up
+#    - Linewise: can't move upward if row is 0
+#    - Characterwise: can't move upward if top selection is at row 0
+#  down
+#    - Linewise: always movable since last row is automatically extended.
+#    - Characterwise: always movable since last row is automatically extended.
+#  right
+#    - Linewise: always movable since EOL is automatically extended.
+#    - Characterwise: always movable since EOL is automatically extended.
+#  left
+#    - Linewise: always true since indent/outdent command can handle it.
+#    - Characterwise: can't move if start of selection is at column 0
+#
+# Moving method
+#  up
+#    - Linewise: rotate linewise
+#    - Characterwise: swap single-row selection with upper block
+#  down
+#    - Linewise: rotate linewise
+#    - Characterwise: swap single-row selection with lower block
+#  right
+#    - Linewise: indent line
+#    - Characterwise: rotate charater in single-row selection.
+#  left
+#    - Linewise: outdent line
+#    - Characterwise: rotate charater in single-row selection.
+
+
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
   require "#{packPath}/lib/#{path}"
@@ -42,18 +80,53 @@ class MoveSelectedText extends TransformString
   isOverwrite: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
 
+  isLinewise: ->
+    switch @vimState.submode
+      when 'linewise' then true
+      when 'characterwise', 'blockwise'
+        @editor.getSelections().some (selection) ->
+          not swrap(selection).isSingleRow()
+
+  isCharacterwise: ->
+    not @isLinewise()
+
+  isMovable: (selection) ->
+    {start} = selection.getBufferRange()
+    switch @direction
+      when 'down', 'right' then true
+      when 'up' then start.row isnt 0
+      when 'left'
+        if @isLinewise() then true else start.column isnt 0
+
   execute: ->
     @withUndoJoin =>
       selections = @editor.getSelectionsOrderedByBufferPosition()
-      topSelection = selections[0]
+      return if @isCharacterwise() and (not @isMovable(selections[0]))
       selections.reverse() if @direction is 'down'
       @editor.transact =>
         @countTimes =>
-          return if (not @isLinewise()) and (not @isMovable(topSelection))
-          for selection in selections
-            @mutate(selection) if @isMovable(selection)
+          @mutateSelections(selections)
 
-  getOverwrittenBySelection: ->
+  mutateSelections: (selections) ->
+    for selection in selections when @isMovable(selection)
+      switch @direction
+        when 'down' # auto insert new linew at last row
+          endRow = selection.getBufferRange().end.row
+          if endRow >= getVimLastBufferRow(@editor)
+            eof = @editor.getEofBufferPosition()
+            @editor.setTextInBufferRange([eof, eof], "\n")
+        when 'right' # automatically append space at EOL
+          if @isCharacterwise()
+            eol = selection.getBufferRange().end
+            if pointIsAtEndOfLine(@editor, eol)
+              @editor.setTextInBufferRange([eol, eol], " ")
+
+      if @isLinewise()
+        @moveLinewise(selection)
+      else
+        @moveCharacterwise(selection)
+
+  getInitialOverwrittenBySelection: ->
     overwrittenBySelection = new Map
     isLinewise = @isLinewise()
     @editor.getSelections().forEach (selection) ->
@@ -73,7 +146,7 @@ class MoveSelectedText extends TransformString
       state.overwrittenBySelection = null
 
     unless state.overwrittenBySelection?
-      state.overwrittenBySelection = @getOverwrittenBySelection()
+      state.overwrittenBySelection = @getInitialOverwrittenBySelection()
 
     fn()
 
@@ -81,50 +154,34 @@ class MoveSelectedText extends TransformString
     if isSequential
       @editor.groupChangesSinceCheckpoint(state.checkpoint)
 
-  getOverwrittenForSelection: (selection, replacedText) ->
+  getOverwrittenForSelection: (selection, disappearing) ->
     {overwrittenBySelection} = stateByEditor.get(@editor)
     overwrittenArea = overwrittenBySelection.get(selection)
 
+    # up and down is both for characterwise and linewise
+    # left and right is only for characterwise
     overwritten = switch @direction
       when 'up'
-        [overwritten, rest...] = overwrittenArea.split("\n")
-        overwrittenArea = [rest..., replacedText].join("\n")
-        overwritten
+        # console.log 'called! up', inspect(overwrittenArea)
+        [appearing, covered...] = overwrittenArea.split("\n")
+        overwrittenArea = [covered..., disappearing].join("\n")
+        appearing
       when 'down'
-        [rest..., overwritten] = overwrittenArea.split("\n")
-        overwrittenArea = [replacedText, rest...].join("\n")
-        overwritten
+        # console.log 'called! down', inspect(overwrittenArea)
+        [covered..., appearing] = overwrittenArea.split("\n")
+        overwrittenArea = [disappearing, covered...].join("\n")
+        appearing
       when 'left'
-        [rest..., overwritten] = overwrittenArea
-        overwrittenArea = [replacedText, rest...].join("")
-        overwritten
+        [covered..., appearing] = overwrittenArea
+        overwrittenArea = [disappearing, covered...].join("")
+        appearing
       when 'right'
-        [overwritten, rest...] = overwrittenArea
-        overwrittenArea = [rest..., replacedText].join("")
-        overwritten
+        [appearing, covered...] = overwrittenArea
+        overwrittenArea = [covered..., disappearing].join("")
+        appearing
 
     overwrittenBySelection.set(selection, overwrittenArea)
     overwritten
-
-  isLinewise: ->
-    switch @vimState.submode
-      when 'linewise'
-        true
-      when 'characterwise', 'blockwise'
-        @editor.getSelections().some (selection) ->
-          not swrap(selection).isSingleRow()
-
-  isMovable: (selection) ->
-    switch @direction
-      when 'down', 'right'
-        true
-      when 'up'
-        selection.getBufferRange().start.row isnt 0
-      when 'left'
-        if @isLinewise()
-          true
-        else
-          selection.getBufferRange().start.column isnt 0
 
   rotateTextForSelection: (selection) ->
     reversed = selection.isReversed()
@@ -138,15 +195,17 @@ class MoveSelectedText extends TransformString
     range = selection.getBufferRange().translate(translation...)
     selection.setBufferRange(range)
 
-    newText = switch @direction
-      when 'up', 'down' # rotate row
-        text = swrap(selection).lineTextForBufferRows()
-        rotated = @rotateText(text, selection, @isOverwrite())[0]
-        rotated.join("\n") + "\n"
-      when 'right', 'left' # rotate column
-        text = selection.getText()
-        rotated = @rotateText(text, selection, @isOverwrite())[0]
-        rotated.join('')
+    # up and down is only for linewise
+    # left and right is only for characterwise
+    text = switch @direction
+      when 'up', 'down' then swrap(selection).lineTextForBufferRows()
+      when 'right', 'left' then selection.getText().split('')
+
+    rotated = @rotateText(text, selection, @isOverwrite())
+    newText = if @isLinewise()
+      rotated.join("\n") + "\n"
+    else
+      rotated.join('')
 
     range = selection.insertText(newText)
     range = range.translate(translation.reverse()...)
@@ -154,38 +213,30 @@ class MoveSelectedText extends TransformString
 
   # Return [rotatedText, overwrittenText]
   rotateText: (text, selection, considerOverwrite=false) ->
+    # up and down is only for linewise
+    # left and right is only for characterwise
     switch @direction
       when 'up', 'left'
         [overwritten, rest...] = text
         overwritten = @getOverwrittenForSelection(selection, overwritten) if considerOverwrite
-        [[rest..., overwritten], overwritten]
+        [rest..., overwritten]
       when 'down', 'right'
         [rest..., overwritten] = text
         overwritten = @getOverwrittenForSelection(selection, overwritten) if considerOverwrite
-        [[overwritten, rest...], overwritten]
+        [overwritten, rest...]
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
   flashTarget: false
 
-  mutate: (selection) ->
-    if @direction is 'down'
-      endRow = selection.getBufferRange().end.row
-      if endRow >= getVimLastBufferRow(@editor)
-        eof = @editor.getEofBufferPosition()
-        @editor.setTextInBufferRange([eof, eof], "\n")
-
-    if @isLinewise()
-      if @vimState.submode is 'linewise'
-        @rotateTextForSelection(selection)
-      else
-        swrap(selection).switchToLinewise => @rotateTextForSelection(selection)
-      @editor.scrollToCursorPosition({center: true})
+  moveLinewise: (selection) ->
+    if @vimState.submode is 'linewise'
+      @rotateTextForSelection(selection)
     else
-      @moveCharacterwise(selection)
+      swrap(selection).switchToLinewise =>
+        @rotateTextForSelection(selection)
+    @editor.scrollToCursorPosition({center: true})
 
-  # Characterwise
-  # -------------------------
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
     # Pre mutate
@@ -221,20 +272,15 @@ class MoveSelectedTextRight extends MoveSelectedText
   direction: 'right'
   flashTarget: false
 
-  mutate: (selection) ->
-    if @isLinewise()
-      switch @direction
-        when 'right' then selection.indentSelectedRows()
-        when 'left' then selection.outdentSelectedRows()
-    else
-      if @direction is 'right'
-        # complement space if EOL
-        point = selection.getBufferRange().end
-        if pointIsAtEndOfLine(@editor, point)
-          @editor.setTextInBufferRange([point, point], " ")
+  moveLinewise: (selection) ->
+    # console.log @direction, "HELLO"
+    switch @direction
+      when 'right' then selection.indentSelectedRows()
+      when 'left' then selection.outdentSelectedRows()
 
-      @rotateTextForSelection(selection)
-      @editor.scrollToCursorPosition({center: true})
+  moveCharacterwise: (selection) ->
+    @rotateTextForSelection(selection)
+    @editor.scrollToCursorPosition({center: true})
 
 class MoveSelectedTextLeft extends MoveSelectedTextRight
   direction: 'left'
