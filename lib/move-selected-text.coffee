@@ -268,7 +268,6 @@ class MoveSelectedTextUp extends MoveSelectedText
       @editor.setTextInBufferRange([eol, eol], spaces)
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
-  @extend()
   direction: 'down'
 
 # -------------------------
@@ -289,7 +288,87 @@ class MoveSelectedTextRight extends MoveSelectedText
 class MoveSelectedTextLeft extends MoveSelectedTextRight
   direction: 'left'
 
+# -------------------------
+class DuplicateSelectedText extends TransformString
+  @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
+  @commandPrefix: 'vim-mode-plus-user'
+  execute: ->
+    selections = @editor.getSelectionsOrderedByBufferPosition()
+    @editor.transact =>
+      for selection in selections # when @isMovable(selection)
+        if @isLinewise()
+          if @vimState.submode is 'linewise'
+            @duplicateLinewise(selection)
+          else
+            swrap(selection).switchToLinewise =>
+              @duplicateLinewise(selection)
+        else
+          @duplicateCharacterwise(selection)
+
+  isCharacterwise: ->
+    not @isLinewise()
+
+  duplicateLinewise: (selection) ->
+    lineTexts = @duplicateText(selection)
+    console.log inspect(lineTexts)
+    switch @direction
+      when 'up'
+        null
+      when 'down'
+        null
+      when 'left', 'right'
+        reversed = selection.isReversed()
+        text = lineTexts.join("\n") + "\n"
+        range = selection.insertText(text)
+        selection.setBufferRange(range, {reversed})
+
+    # selection.insertText(text)
+    # console.log "duplicate #{@direction} #{count} times linewise"
+
+  duplicateCharacterwise: (selection) ->
+    count = @getCount()
+    console.log "duplicate #{@direction} #{count} times characterwise"
+
+  isLinewise: ->
+    switch @vimState.submode
+      when 'linewise' then true
+      when 'characterwise', 'blockwise'
+        @editor.getSelections().some (selection) ->
+          not swrap(selection).isSingleRow()
+
+  duplicateText: (selection) ->
+    if @isLinewise()
+      switch @direction
+        when 'up', 'down'
+          rows = swrap(selection).lineTextForBufferRows()
+          lineTexts = []
+          @countTimes =>
+            lineTexts.push(rows...)
+          lineTexts
+          # console.log inspect(lineTexts)
+        when 'left', 'right'
+          count = @getCount()
+          rows = swrap(selection).lineTextForBufferRows()
+          lineTexts = rows.map (text) ->
+            _.multiplyString(text, count+1)
+          lineTexts
+
+class DuplicateSelectedTextUp extends DuplicateSelectedText
+  direction: 'up'
+
+class DuplicateSelectedTextDown extends DuplicateSelectedText
+  direction: 'down'
+
+class DuplicateSelectedTextRight extends DuplicateSelectedText
+  direction: 'right'
+
+class DuplicateSelectedTextLeft extends DuplicateSelectedText
+  direction: 'left'
+
 module.exports = {
   MoveSelectedTextDown, MoveSelectedTextUp
   MoveSelectedTextRight, MoveSelectedTextLeft
+
+  DuplicateSelectedTextDown, DuplicateSelectedTextUp
+  DuplicateSelectedTextRight, DuplicateSelectedTextLeft
 }
