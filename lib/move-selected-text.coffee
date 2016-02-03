@@ -312,10 +312,16 @@ class DuplicateSelectedText extends TransformString
     lineTexts = @duplicateText(selection)
     console.log inspect(lineTexts)
     switch @direction
-      when 'up'
-        null
-      when 'down'
-        null
+      when 'up', 'down'
+        reversed = selection.isReversed()
+
+        which = if @direction is 'up' then 'start' else 'end'
+        point = selection.getBufferRange()[which]
+
+        text = lineTexts.join("\n") + "\n"
+        range = @editor.setTextInBufferRange([point, point], text)
+        selection.setBufferRange(range, {reversed})
+
       when 'left', 'right'
         reversed = selection.isReversed()
         text = lineTexts.join("\n") + "\n"
