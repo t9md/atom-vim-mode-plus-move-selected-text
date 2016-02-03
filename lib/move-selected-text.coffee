@@ -43,9 +43,10 @@ requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
   require "#{packPath}/lib/#{path}"
 
-{pointIsAtEndOfLine, getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
+{pointIsAtEndOfLine, sortRanges, getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 Base = requireFrom('vim-mode-plus', 'base')
+BlockwiseSelect = Base.getClass('BlockwiseSelect')
 TransformString = Base.getClass('Operator')
 
 newState = ->
@@ -302,22 +303,34 @@ class DuplicateSelectedText extends TransformString
 
     isLinewise = @isLinewise()
     @editor.transact =>
-      for selection in selections
-        if isLinewise
+      if isLinewise
+        for selection in selections
           if @vimState.submode is 'linewise'
             @duplicateLinewise(selection)
           else
             swrap(selection).switchToLinewise =>
               @duplicateLinewise(selection)
-        else
-          switch @direction
-            when 'right', 'left'
+      else
+        switch @direction
+          when 'right', 'left'
+            for selection in selections
               @duplicateCharacterwise(selection)
-            when 'up', 'down'
-              console.log selection.getText()
-              @countTimes =>
-                @duplicateCharacterwise(selection, {topRow, bottomRow})
-
+          when 'up', 'down'
+            lastSelection = @editor.getLastSelection()
+            reversed = lastSelection.isReversed()
+            # selection.setBufferRange(range, {reversed})
+            height = selections.length
+            totalHeight = height * @getCount()
+            lackOfSelection = totalHeight - height
+            ranges = []
+            @countTimes =>
+              for selection in selections
+                ranges.push(@duplicateCharacterwise(selection, {topRow, bottomRow}))
+                selection.destroy() unless selection.isLastSelection()
+            ranges = sortRanges(ranges)
+            range = [_.first(ranges).start, _.last(ranges).end.translate([totalHeight - 1, 0])]
+            lastSelection.setBufferRange(range, {reversed})
+            new BlockwiseSelect(@vimState).execute()
   isCharacterwise: ->
     not @isLinewise()
 
@@ -335,32 +348,28 @@ class DuplicateSelectedText extends TransformString
         @editor.setTextInBufferRange([point, point], newText)
       when 'left', 'right'
         selection.insertText(newText)
-
     selection.setBufferRange(range, {reversed})
 
   insertTextAtPoint: (point, text) ->
     @editor.setTextInBufferRange([point, point], text)
 
   duplicateCharacterwise: (selection, {topRow, bottomRow}={}) ->
-    reversed = selection.isReversed()
     switch @direction
       when 'up', 'down'
         lineTexts = @duplicateText(selection, 1)
         spaces = ' '.repeat(selection.getBufferRange().start.column)
-        insertionStart = switch @direction
+        point = switch @direction
           when 'up' then [topRow-1, Infinity]
           when 'down' then [bottomRow, Infinity]
-        {end} = @insertTextAtPoint(insertionStart, "\n" + spaces)
-        range = @insertTextAtPoint(end, lineTexts.join(""))
-        selection.setBufferRange(range, {reversed})
+        {end} = @insertTextAtPoint(point, "\n" + spaces)
+        @insertTextAtPoint(end, lineTexts.join(""))
       when 'left', 'right'
         lineTexts = @duplicateText(selection, @getCount())
         {start, end} = selection.getBufferRange()
         point = switch @direction
           when 'left' then start
           when 'right' then end
-        range = @insertTextAtPoint(point, lineTexts.join(""))
-        selection.setBufferRange(range, {reversed})
+        @insertTextAtPoint(point, lineTexts.join(""))
 
   isLinewise: ->
     switch @vimState.submode
