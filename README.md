@@ -20,7 +20,7 @@ This package is feature migration from my [vim-textmanip](https://github.com/t9m
 
 - [ ] Write spec
 - [ ] Work as screenPosition wise for characterwise move to support soft-wrapped buffer.
-- [ ] Duplicate above/below with overwrite mode support
+- [x] Duplicate above/below with overwrite mode support
 - [x] blockwise support
 - [x] Support count
 - [x] Concatenate undo history to revert continuous movement with one undo
@@ -33,9 +33,15 @@ Set following keymap to in your `keymap.cson`.
 
 ```coffeescipt
 'atom-text-editor.vim-mode-plus.visual-mode':
+  'ctrl-t': 'vim-mode-plus-user:toggle-overwrite'
+
   'ctrl-k': 'vim-mode-plus-user:move-selected-text-up'
   'ctrl-j': 'vim-mode-plus-user:move-selected-text-down'
-  'ctrl-l': 'vim-mode-plus-user:move-selected-text-right'
   'ctrl-h': 'vim-mode-plus-user:move-selected-text-left'
-  'ctrl-t': 'vim-mode-plus-user:toggle-overwrite'
+  'ctrl-l': 'vim-mode-plus-user:move-selected-text-right'
+
+  'cmd-K': 'vim-mode-plus-user:duplicate-selected-text-up'
+  'cmd-J': 'vim-mode-plus-user:duplicate-selected-text-down'
+  'cmd-H': 'vim-mode-plus-user:duplicate-selected-text-left'
+  'cmd-L': 'vim-mode-plus-user:duplicate-selected-text-right'
 ```
