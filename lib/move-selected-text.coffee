@@ -101,7 +101,7 @@ class MoveSelectedText extends TransformString
     @withUndoJoin =>
       selections = @editor.getSelectionsOrderedByBufferPosition()
       return if @isCharacterwise() and (not @isMovable(selections[0]))
-      selections.reverse() if @direction is 'up'
+      selections.reverse() if @direction is 'down'
       @editor.transact =>
         @countTimes =>
           @mutateSelections(selections)
@@ -296,8 +296,6 @@ class DuplicateSelectedText extends TransformString
 
   execute: ->
     selections = @editor.getSelectionsOrderedByBufferPosition()
-    topRow = selections[0].getBufferRange().start.row
-    bottomRow = _.last(selections).getBufferRange().start.row
     selections.reverse() if @direction in ['down', 'up']
 
     isLinewise = @isLinewise()
@@ -313,8 +311,26 @@ class DuplicateSelectedText extends TransformString
         switch @direction
           when 'right', 'left'
             for selection in selections
-              range = @duplicateCharacterwise(selection)
-              selection.setBufferRange(range)
+              newText = selection.getText().repeat(@getCount())
+              width = newText.length
+              {start, end} = selection.getBufferRange()
+              switch @direction
+                when 'left'
+                  range = if @isOverwrite()
+                    [start.translate([0, -width]), start]
+                  else
+                    [start, start]
+                  range = @editor.setTextInBufferRange(range, newText)
+                  selection.setBufferRange(range)
+
+                when 'right'
+                  range = if @isOverwrite()
+                    [end, end.translate([0, +width])]
+                  else
+                    [end, end]
+                  range = @editor.setTextInBufferRange(range, newText)
+                  selection.setBufferRange(range)
+
           when 'up', 'down'
             getBaseTexts = (blockwiseSelection) ->
               blockwiseSelection.selections.map (selection) ->
@@ -328,59 +344,46 @@ class DuplicateSelectedText extends TransformString
                 end: {row: endRow, column: endColumn}
               } = blockwiseSelection.getBufferRange()
 
-              newText = _.flatten([1..@getCount()].map -> baseTexts).join("\n")
-              range = switch @direction
-                when 'up'
-                  point = @insertTextAtPoint([startRow - 1, Infinity], "\n").end
-                  @insertTextAtPoint(point, newText)
-                when 'down'
-                  range = @insertTextAtPoint([endRow + 1, 0], newText)
-                  @insertTextAtPoint(range.end, "\n")
-                  range
+              lineTexts = _.flatten([1..@getCount()].map -> baseTexts)
+              height = lineTexts.length
+              newText = lineTexts.join("\n")
+              if @isOverwrite()
+                @duplicateBlockwiseSelection(blockwiseSelection, @direction)
+              else
+                switch @direction
+                  when 'up'
+                    point = @insertTextAtPoint([startRow - 1, Infinity], "\n").end
+                    {start, end} = @insertTextAtPoint(point, newText)
+                    newRange = [[start.row, startColumn], [end.row, endColumn]]
+                    blockwiseSelection.setBufferRange(newRange)
 
-              {start, end} = range
-              newRange = [[start.row, startColumn], [end.row, endColumn]]
-              blockwiseSelection.setBufferRange(newRange)
+                  when 'down'
+                    range = @insertTextAtPoint([endRow + 1, 0], newText)
+                    @insertTextAtPoint(range.end, "\n")
+                    {start, end} = range
+                    newRange = [[start.row, startColumn], [end.row, endColumn]]
+                    blockwiseSelection.setBufferRange(newRange)
 
-  isCharacterwise: ->
-    not @isLinewise()
+  duplicateBlockwiseSelection: (blockwiseSelection, direction) ->
+    {selections} = blockwiseSelection
+    height = selections.length
+    translation = switch direction
+      when 'up' then [-height, 0]
+      when 'down' then [+height, 0]
 
-  duplicateLinewise: (selection) ->
-    lineTexts = @duplicateText(selection, @getCount())
-    reversed = selection.isReversed()
-    newText = lineTexts.join("\n") + "\n"
+    selections.forEach (selection) =>
+      range = selection.getBufferRange().translate(translation)
+      @complementSpacesToPoint(range.start)
+      range = @editor.setTextInBufferRange(range, selection.getText())
+      selection.setBufferRange(range)
 
-    range = switch @direction
-      when 'up', 'down'
-        {start, end} = selection.getBufferRange()
-        point = switch @direction
-          when 'up' then start
-          when 'down' then end
-        @editor.setTextInBufferRange([point, point], newText)
-      when 'left', 'right'
-        selection.insertText(newText)
-    selection.setBufferRange(range, {reversed})
+  complementSpacesToPoint: ({row, column}) ->
+    eol = @editor.bufferRangeForBufferRow(row).end
+    if (fillCount = column - eol.column) > 0
+      @editor.setTextInBufferRange([eol, eol], ' '.repeat(fillCount))
 
   insertTextAtPoint: (point, text) ->
     @editor.setTextInBufferRange([point, point], text)
-
-  duplicateCharacterwise: (selection, {topRow, bottomRow}={}) ->
-    switch @direction
-      when 'up', 'down'
-        lineTexts = @duplicateText(selection, 1)
-        spaces = ' '.repeat(selection.getBufferRange().start.column)
-        point = switch @direction
-          when 'up' then [topRow-1, Infinity]
-          when 'down' then [bottomRow, Infinity]
-        {end} = @insertTextAtPoint(point, "\n" + spaces)
-        @insertTextAtPoint(end, lineTexts.join(""))
-      when 'left', 'right'
-        lineTexts = @duplicateText(selection, @getCount())
-        {start, end} = selection.getBufferRange()
-        point = switch @direction
-          when 'left' then start
-          when 'right' then end
-        @insertTextAtPoint(point, lineTexts.join(""))
 
   isLinewise: ->
     switch @vimState.submode
@@ -389,17 +392,42 @@ class DuplicateSelectedText extends TransformString
         @editor.getSelections().some (selection) ->
           not swrap(selection).isSingleRow()
 
-  duplicateText: (selection, count) ->
-    if @isLinewise()
+  isCharacterwise: ->
+    not @isLinewise()
+
+  isOverwrite: ->
+    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+
+  duplicateLinewise: (selection) ->
+    duplicateText = (selection, direction, count) ->
       rows = swrap(selection).lineTextForBufferRows()
-      switch @direction
+      switch direction
         when 'up', 'down' then _.flatten([1..count].map -> rows)
         when 'left', 'right' then rows.map (text) -> text.repeat(count+1)
-    else
-      text = selection.getText()
-      switch @direction
-        when 'up', 'down' then [1..count].map -> text
-        when 'left', 'right' then [text.repeat(count)]
+
+    lineTexts = duplicateText(selection, @direction, @getCount())
+    reversed = selection.isReversed()
+    newText = lineTexts.join("\n") + "\n"
+    range = switch @direction
+      when 'up', 'down'
+        if @isOverwrite()
+          [startRow, endRow] = selection.getBufferRowRange()
+          height = lineTexts.length
+          {start, end} = selection.getBufferRange()
+          range = switch @direction
+            when 'up' then [[startRow - height, 0], [startRow, 0]]
+            when 'down' then [[endRow + 1, 0], [endRow + 1 + height, 0]]
+          newText = lineTexts.join("\n") + "\n"
+          @editor.setTextInBufferRange(range, newText)
+        else
+          {start, end} = selection.getBufferRange()
+          point = switch @direction
+            when 'up' then start
+            when 'down' then end
+          @insertTextAtPoint(point, newText)
+      when 'left', 'right'
+        selection.insertText(newText)
+    selection.setBufferRange(range, {reversed})
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
   direction: 'up'
