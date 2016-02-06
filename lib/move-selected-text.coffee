@@ -89,6 +89,11 @@ class MoveSelectedText extends TransformString
   isCharacterwise: ->
     not @isLinewise()
 
+  complementSpacesToPoint: ({row, column}) ->
+    eol = @editor.bufferRangeForBufferRow(row).end
+    if (fillCount = column - eol.column) > 0
+      @editor.setTextInBufferRange([eol, eol], ' '.repeat(fillCount))
+
   isMovable: (selection) ->
     {start} = selection.getBufferRange()
     switch @direction
@@ -108,18 +113,6 @@ class MoveSelectedText extends TransformString
 
   mutateSelections: (selections) ->
     for selection in selections when @isMovable(selection)
-      switch @direction
-        when 'down' # auto insert new linew at last row
-          endRow = selection.getBufferRange().end.row
-          if endRow >= getVimLastBufferRow(@editor)
-            eof = @editor.getEofBufferPosition()
-            @editor.setTextInBufferRange([eof, eof], "\n")
-        when 'right' # automatically append space at EOL
-          if @isCharacterwise()
-            eol = selection.getBufferRange().end
-            if pointIsAtEndOfLine(@editor, eol)
-              @editor.setTextInBufferRange([eol, eol], " ")
-
       if @isLinewise()
         @moveLinewise(selection)
       else
@@ -197,6 +190,12 @@ class MoveSelectedText extends TransformString
       when 'right' then [[0, 0], [0, +1]]
       when 'left' then [[0, -1], [0, 0]]
 
+    if @direction is 'down' # auto insert new linew at last row
+      endRow = selection.getBufferRange().end.row
+      if endRow >= getVimLastBufferRow(@editor)
+        eof = @editor.getEofBufferPosition()
+        @editor.setTextInBufferRange([eof, eof], "\n")
+
     range = selection.getBufferRange().translate(translation...)
     selection.setBufferRange(range)
 
@@ -263,11 +262,6 @@ class MoveSelectedTextUp extends MoveSelectedText
 
     selection.setBufferRange(toRange, {reversed})
 
-  complementSpacesToPoint: ({row, column}) ->
-    eol = @editor.bufferRangeForBufferRow(row).end
-    if (fillCount = column - eol.column) > 0
-      @editor.setTextInBufferRange([eol, eol], ' '.repeat(fillCount))
-
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
 
@@ -282,6 +276,12 @@ class MoveSelectedTextRight extends MoveSelectedText
       when 'left' then selection.outdentSelectedRows()
 
   moveCharacterwise: (selection) ->
+    # automatically append space at EOL
+    if @direction is 'right'
+      eol = selection.getBufferRange().end
+      if pointIsAtEndOfLine(@editor, eol)
+        @editor.setTextInBufferRange([eol, eol], " ")
+
     @rotateTextForSelection(selection)
     @editor.scrollToCursorPosition({center: true})
 
@@ -289,10 +289,7 @@ class MoveSelectedTextLeft extends MoveSelectedTextRight
   direction: 'left'
 
 # -------------------------
-class DuplicateSelectedText extends TransformString
-  @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
-  @commandPrefix: 'vim-mode-plus-user'
-
+class DuplicateSelectedText extends MoveSelectedText
   execute: ->
     selections = @editor.getSelectionsOrderedByBufferPosition()
     selections.reverse() if @direction in ['down', 'up']
@@ -325,40 +322,22 @@ class DuplicateSelectedText extends TransformString
   insertTextAtPoint: (point, text) ->
     @editor.setTextInBufferRange([point, point], text)
 
-  complementSpacesToPoint: ({row, column}) ->
-    eol = @editor.bufferRangeForBufferRow(row).end
-    if (fillCount = column - eol.column) > 0
-      @editor.setTextInBufferRange([eol, eol], ' '.repeat(fillCount))
-
-  isLinewise: ->
-    switch @vimState.submode
-      when 'linewise' then true
-      when 'characterwise', 'blockwise'
-        @editor.getSelections().some (selection) ->
-          not swrap(selection).isSingleRow()
-
-  isCharacterwise: ->
-    not @isLinewise()
-
-  isOverwrite: ->
-    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+  duplicateText: (selection, direction, count) ->
+    rows = swrap(selection).lineTextForBufferRows()
+    switch direction
+      when 'up', 'down' then _.flatten([1..count].map -> rows)
+      when 'left', 'right' then rows.map (text) -> text.repeat(count+1)
 
   duplicateLinewise: (selection) ->
-    duplicateText = (selection, direction, count) ->
-      rows = swrap(selection).lineTextForBufferRows()
-      switch direction
-        when 'up', 'down' then _.flatten([1..count].map -> rows)
-        when 'left', 'right' then rows.map (text) -> text.repeat(count+1)
-
     reversed = selection.isReversed()
-    lineTexts = duplicateText(selection, @direction, @getCount())
+    lineTexts = @duplicateText(selection, @direction, @getCount())
     newText = lineTexts.join("\n") + "\n"
 
     switch @direction
       when 'up', 'down'
         if @isOverwrite()
-          [startRow, endRow] = selection.getBufferRowRange()
           height = lineTexts.length
+          [startRow, endRow] = selection.getBufferRowRange()
           range = switch @direction
             when 'up' then [[startRow - height, 0], [startRow, 0]]
             when 'down' then [[endRow + 1, 0], [endRow + 1 + height, 0]]
