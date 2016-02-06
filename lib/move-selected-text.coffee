@@ -76,6 +76,9 @@ class MoveSelectedText extends TransformString
   getSelectedTexts: ->
     @editor.getSelections().map((selection) -> selection.getText()).join("\n")
 
+  insertTextAtPoint: (point, text) ->
+    @editor.setTextInBufferRange([point, point], text)
+
   isOverwrite: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
 
@@ -89,10 +92,14 @@ class MoveSelectedText extends TransformString
   isCharacterwise: ->
     not @isLinewise()
 
+  setTextInRangeAndSelect: (range, text, selection) ->
+    newRange = @editor.setTextInBufferRange(range, text)
+    selection.setBufferRange(newRange)
+
   complementSpacesToPoint: ({row, column}) ->
     eol = @editor.bufferRangeForBufferRow(row).end
     if (fillCount = column - eol.column) > 0
-      @editor.setTextInBufferRange([eol, eol], ' '.repeat(fillCount))
+      @insertTextAtPoint(eol, ' '.repeat(fillCount))
 
   isMovable: (selection) ->
     {start} = selection.getBufferRange()
@@ -193,8 +200,7 @@ class MoveSelectedText extends TransformString
     if @direction is 'down' # auto insert new linew at last row
       endRow = selection.getBufferRange().end.row
       if endRow >= getVimLastBufferRow(@editor)
-        eof = @editor.getEofBufferPosition()
-        @editor.setTextInBufferRange([eof, eof], "\n")
+        @insertTextAtPoint(@editor.getEofBufferPosition(), "\n")
 
     range = selection.getBufferRange().translate(translation...)
     selection.setBufferRange(range)
@@ -280,7 +286,7 @@ class MoveSelectedTextRight extends MoveSelectedText
     if @direction is 'right'
       eol = selection.getBufferRange().end
       if pointIsAtEndOfLine(@editor, eol)
-        @editor.setTextInBufferRange([eol, eol], " ")
+        @insertTextAtPoint(eol, " ")
 
     @rotateTextForSelection(selection)
     @editor.scrollToCursorPosition({center: true})
@@ -311,16 +317,6 @@ class DuplicateSelectedText extends MoveSelectedText
           when 'up', 'down'
             for blockwiseSelection in @vimState.getBlockwiseSelections()
               @duplicateCharacterwise(blockwiseSelection)
-
-  setTextInRangeAndSelect: (range, text, selection) ->
-    newRange = @editor.setTextInBufferRange(range, text)
-    selection.setBufferRange(newRange)
-
-  insertTextAtPointAndSelect: (point, text, selection) ->
-    @setTextInRangeAndSelect([point, point], text, selection)
-
-  insertTextAtPoint: (point, text) ->
-    @editor.setTextInBufferRange([point, point], text)
 
   duplicateText: (selection, direction, count) ->
     rows = swrap(selection).lineTextForBufferRows()
