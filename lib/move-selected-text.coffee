@@ -277,7 +277,6 @@ class MoveSelectedTextRight extends MoveSelectedText
   flashTarget: false
 
   moveLinewise: (selection) ->
-    # console.log @direction, "HELLO"
     switch @direction
       when 'right' then selection.indentSelectedRows()
       when 'left' then selection.outdentSelectedRows()
@@ -314,22 +313,18 @@ class DuplicateSelectedText extends TransformString
               newText = selection.getText().repeat(@getCount())
               width = newText.length
               {start, end} = selection.getBufferRange()
-              switch @direction
+              range = switch @direction
                 when 'left'
-                  range = if @isOverwrite()
+                  if @isOverwrite()
                     [start.translate([0, -width]), start]
                   else
                     [start, start]
-                  range = @editor.setTextInBufferRange(range, newText)
-                  selection.setBufferRange(range)
-
                 when 'right'
-                  range = if @isOverwrite()
+                  if @isOverwrite()
                     [end, end.translate([0, +width])]
                   else
                     [end, end]
-                  range = @editor.setTextInBufferRange(range, newText)
-                  selection.setBufferRange(range)
+              @setTextInRangeAndSelect(range, newText, selection)
 
           when 'up', 'down'
             getBaseTexts = (blockwiseSelection) ->
@@ -374,16 +369,22 @@ class DuplicateSelectedText extends TransformString
     selections.forEach (selection) =>
       range = selection.getBufferRange().translate(translation)
       @complementSpacesToPoint(range.start)
-      range = @editor.setTextInBufferRange(range, selection.getText())
-      selection.setBufferRange(range)
+      @setTextInRangeAndSelect(range, selection.getText(), selection)
+
+  setTextInRangeAndSelect: (range, text, selection) ->
+    newRange = @editor.setTextInBufferRange(range, text)
+    selection.setBufferRange(newRange)
+
+  insertTextAtPointAndSelect: (point, text, selection) ->
+    @setTextInRangeAndSelect([point, point], text, selection)
+
+  insertTextAtPoint: (point, text) ->
+    @editor.setTextInBufferRange([point, point], text)
 
   complementSpacesToPoint: ({row, column}) ->
     eol = @editor.bufferRangeForBufferRow(row).end
     if (fillCount = column - eol.column) > 0
       @editor.setTextInBufferRange([eol, eol], ' '.repeat(fillCount))
-
-  insertTextAtPoint: (point, text) ->
-    @editor.setTextInBufferRange([point, point], text)
 
   isLinewise: ->
     switch @vimState.submode
@@ -405,29 +406,27 @@ class DuplicateSelectedText extends TransformString
         when 'up', 'down' then _.flatten([1..count].map -> rows)
         when 'left', 'right' then rows.map (text) -> text.repeat(count+1)
 
-    lineTexts = duplicateText(selection, @direction, @getCount())
     reversed = selection.isReversed()
+    lineTexts = duplicateText(selection, @direction, @getCount())
     newText = lineTexts.join("\n") + "\n"
-    range = switch @direction
+
+    switch @direction
       when 'up', 'down'
         if @isOverwrite()
           [startRow, endRow] = selection.getBufferRowRange()
           height = lineTexts.length
-          {start, end} = selection.getBufferRange()
           range = switch @direction
             when 'up' then [[startRow - height, 0], [startRow, 0]]
             when 'down' then [[endRow + 1, 0], [endRow + 1 + height, 0]]
-          newText = lineTexts.join("\n") + "\n"
-          @editor.setTextInBufferRange(range, newText)
+          @setTextInRangeAndSelect(range, newText, selection)
         else
-          {start, end} = selection.getBufferRange()
           point = switch @direction
-            when 'up' then start
-            when 'down' then end
-          @insertTextAtPoint(point, newText)
+            when 'up' then selection.getBufferRange().start
+            when 'down' then selection.getBufferRange().end
+          @setTextInRangeAndSelect([point, point], newText, selection)
       when 'left', 'right'
-        selection.insertText(newText)
-    selection.setBufferRange(range, {reversed})
+        range = selection.insertText(newText)
+        selection.setBufferRange(range, {reversed})
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
   direction: 'up'
