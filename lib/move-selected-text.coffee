@@ -46,7 +46,6 @@ requireFrom = (pack, path) ->
 {pointIsAtEndOfLine, sortRanges, getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 Base = requireFrom('vim-mode-plus', 'base')
-BlockwiseSelect = Base.getClass('BlockwiseSelect')
 TransformString = Base.getClass('Operator')
 
 newState = ->
@@ -314,23 +313,35 @@ class DuplicateSelectedText extends TransformString
         switch @direction
           when 'right', 'left'
             for selection in selections
-              @duplicateCharacterwise(selection)
+              range = @duplicateCharacterwise(selection)
+              selection.setBufferRange(range)
           when 'up', 'down'
-            lastSelection = @editor.getLastSelection()
-            reversed = lastSelection.isReversed()
-            # selection.setBufferRange(range, {reversed})
-            height = selections.length
-            totalHeight = height * @getCount()
-            lackOfSelection = totalHeight - height
-            ranges = []
-            @countTimes =>
-              for selection in selections
-                ranges.push(@duplicateCharacterwise(selection, {topRow, bottomRow}))
-                selection.destroy() unless selection.isLastSelection()
-            ranges = sortRanges(ranges)
-            range = [_.first(ranges).start, _.last(ranges).end.translate([totalHeight - 1, 0])]
-            lastSelection.setBufferRange(range, {reversed})
-            new BlockwiseSelect(@vimState).execute()
+            getBaseTexts = (blockwiseSelection) ->
+              blockwiseSelection.selections.map (selection) ->
+                numberOfSpace = selection.getBufferRange().start.column
+                ' '.repeat(numberOfSpace) + selection.getText()
+
+            for blockwiseSelection in @vimState.getBlockwiseSelections()
+              baseTexts = getBaseTexts(blockwiseSelection)
+              {
+                start: {row: startRow, column: startColumn}
+                end: {row: endRow, column: endColumn}
+              } = blockwiseSelection.getBufferRange()
+
+              newText = _.flatten([1..@getCount()].map -> baseTexts).join("\n")
+              range = switch @direction
+                when 'up'
+                  point = @insertTextAtPoint([startRow - 1, Infinity], "\n").end
+                  @insertTextAtPoint(point, newText)
+                when 'down'
+                  range = @insertTextAtPoint([endRow + 1, 0], newText)
+                  @insertTextAtPoint(range.end, "\n")
+                  range
+
+              {start, end} = range
+              newRange = [[start.row, startColumn], [end.row, endColumn]]
+              blockwiseSelection.setBufferRange(newRange)
+
   isCharacterwise: ->
     not @isLinewise()
 
