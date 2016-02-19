@@ -36,8 +36,11 @@
 #    - Characterwise: rotate charater in single-row selection.
 
 _ = require 'underscore-plus'
-{CompositeDisposable} = require 'atom'
+{CompositeDisposable, Range, Point} = require 'atom'
 {inspect} = require 'util'
+
+sortRanges = (ranges) ->
+  ranges.sort((a, b) -> a.compare(b))
 
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
@@ -56,6 +59,7 @@ newState = ->
 stateByEditor = new Map
 disposableByEditor = new Map
 
+# Move
 # -------------------------
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
@@ -85,7 +89,8 @@ class MoveSelectedText extends TransformString
   isLinewise: ->
     switch @vimState.submode
       when 'linewise' then true
-      when 'characterwise', 'blockwise'
+      when 'blockwise' then false
+      when 'characterwise'
         @editor.getSelections().some (selection) ->
           not swrap(selection).isSingleRow()
 
@@ -271,7 +276,6 @@ class MoveSelectedTextUp extends MoveSelectedText
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
 
-# -------------------------
 class MoveSelectedTextRight extends MoveSelectedText
   direction: 'right'
   flashTarget: false
@@ -294,15 +298,15 @@ class MoveSelectedTextRight extends MoveSelectedText
 class MoveSelectedTextLeft extends MoveSelectedTextRight
   direction: 'left'
 
+# Duplicate
 # -------------------------
 class DuplicateSelectedText extends MoveSelectedText
   execute: ->
     selections = @editor.getSelectionsOrderedByBufferPosition()
     selections.reverse() if @direction in ['down', 'up']
 
-    isLinewise = @isLinewise()
     @editor.transact =>
-      if isLinewise
+      if @isLinewise()
         for selection in selections
           if @vimState.submode is 'linewise'
             @duplicateLinewise(selection)
@@ -318,34 +322,36 @@ class DuplicateSelectedText extends MoveSelectedText
             for blockwiseSelection in @vimState.getBlockwiseSelections()
               @duplicateCharacterwise(blockwiseSelection)
 
-  duplicateText: (selection, direction, count) ->
-    rows = swrap(selection).lineTextForBufferRows()
+  # Can move to util
+  duplicateLinewiseText: (rows, direction, count) ->
     switch direction
       when 'up', 'down' then _.flatten([1..count].map -> rows)
-      when 'left', 'right' then rows.map (text) -> text.repeat(count+1)
+      when 'left', 'right' then rows.map (text) -> text.repeat(count)
 
   duplicateLinewise: (selection) ->
-    reversed = selection.isReversed()
-    lineTexts = @duplicateText(selection, @direction, @getCount())
+    count = @getCount()
+    count += 1 if @direction in ['left', 'right']
+    {start, end} = selection.getBufferRange()
+    rows = swrap(selection).lineTextForBufferRows()
+    if @direction is 'up' and @isOverwrite()
+      count = Math.min(count, Math.floor(start.row / rows.length))
+      return unless count > 0
+    lineTexts = @duplicateLinewiseText(rows, @direction, count)
+    height = lineTexts.length
     newText = lineTexts.join("\n") + "\n"
 
-    switch @direction
-      when 'up', 'down'
-        if @isOverwrite()
-          height = lineTexts.length
-          [startRow, endRow] = selection.getBufferRowRange()
-          range = switch @direction
-            when 'up' then [[startRow - height, 0], [startRow, 0]]
-            when 'down' then [[endRow + 1, 0], [endRow + 1 + height, 0]]
-          @setTextInRangeAndSelect(range, newText, selection)
-        else
-          point = switch @direction
-            when 'up' then selection.getBufferRange().start
-            when 'down' then selection.getBufferRange().end
-          @setTextInRangeAndSelect([point, point], newText, selection)
+    range = switch @direction
+      when 'up'
+        start = end = start
+        start = start.translate([-height, 0]) if @isOverwrite()
+        new Range(start, end)
+      when 'down'
+        start = end = end
+        end = end.translate([+height, 0]) if @isOverwrite()
+        new Range(start, end)
       when 'left', 'right'
-        range = selection.insertText(newText)
-        selection.setBufferRange(range, {reversed})
+        selection.getBufferRange()
+    @setTextInRangeAndSelect(range, newText, selection)
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
   direction: 'up'
@@ -353,21 +359,35 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     {selections} = blockwiseSelection
     height = selections.length
 
+    count = @getCount()
     unless @isOverwrite() # Insert Blank row
       [startRow, endRow] = blockwiseSelection.getBufferRowRange()
       point = switch direction
         when 'up' then [startRow - 1, Infinity]
         when 'down' then [endRow + 1, 0]
-      @insertTextAtPoint(point, "\n".repeat(height))
+      @insertTextAtPoint(point, "\n".repeat(height * count))
 
-    translation = switch direction
-      when 'up' then [-height, 0]
-      when 'down' then [+height, 0]
+    getTranslation = (direction, count) ->
+      switch direction
+        when 'up' then [-height * count, 0]
+        when 'down' then [+height * count, 0]
 
-    selections.forEach (selection) =>
-      range = selection.getBufferRange().translate(translation)
-      @complementSpacesToPoint(range.start)
-      @setTextInRangeAndSelect(range, selection.getText(), selection)
+    ranges = []
+    @countTimes (num) =>
+      selections.forEach (selection) =>
+        translation = getTranslation(direction, num)
+        range = selection.getBufferRange().translate(translation)
+        @complementSpacesToPoint(range.start)
+        ranges.push @editor.setTextInBufferRange(range, selection.getText())
+    sortRanges(ranges)
+    first = ranges[0]
+    last = _.last(ranges)
+    range = if blockwiseSelection.headReversedStateIsInSync()
+      new Range(first.start, last.end)
+    else
+      new Range(first.end, last.start).translate([0, -1], [0, +1])
+    #   [first.end, last.start]
+    blockwiseSelection.setBufferRange(range)
 
   duplicateCharacterwise: (blockwiseSelection) ->
     @duplicateBlockwiseSelection(blockwiseSelection, @direction)
