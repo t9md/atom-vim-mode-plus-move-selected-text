@@ -37,21 +37,23 @@
 
 _ = require 'underscore-plus'
 {CompositeDisposable, Range, Point} = require 'atom'
+{
+  sortRanges
+  requireFrom
+  getSelectedTexts
+  insertTextAtPoint
+  setTextInRangeAndSelect
+  insertSpacesToPoint
+  extendLastBufferRowToRow
+} = require './utils'
 {inspect} = require 'util'
 
-sortRanges = (ranges) ->
-  ranges.sort((a, b) -> a.compare(b))
-
-requireFrom = (pack, path) ->
-  packPath = atom.packages.resolvePackagePath(pack)
-  require "#{packPath}/lib/#{path}"
-
-{pointIsAtEndOfLine, sortRanges, getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
+{pointIsAtEndOfLine, sortRanges} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 Base = requireFrom('vim-mode-plus', 'base')
 TransformString = Base.getClass('Operator')
 
-newState = ->
+class State
   selectedTexts: null
   checkpoint: null
   overwrittenBySelection: null
@@ -65,23 +67,28 @@ class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
 
+  initState: ->
+    stateByEditor.set(@editor, new State())
+
+  getState: ->
+    stateByEditor.get(@editor)
+
+  hasState: ->
+    stateByEditor.has(@editor)
+
+  removeState: ->
+    stateByEditor.delete(@editor)
+
   initialize: ->
-    stateByEditor.set(@editor, newState()) unless stateByEditor.has(@editor)
+    @initState() unless @hasState()
     unless disposableByEditor.has(@editor)
       disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) =>
-        if mode is 'visual'
-          stateByEditor.delete(@editor)
+        @removeState() if mode is 'visual'
 
       disposableByEditor.set @editor, @editor.onDidDestroy =>
         disposable.dispose()
-        stateByEditor.delete(@editor)
         disposableByEditor.delete(@editor)
-
-  getSelectedTexts: ->
-    @editor.getSelections().map((selection) -> selection.getText()).join("\n")
-
-  insertTextAtPoint: (point, text) ->
-    @editor.setTextInBufferRange([point, point], text)
+        @removeState()
 
   isOverwrite: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
@@ -97,38 +104,11 @@ class MoveSelectedText extends TransformString
   isCharacterwise: ->
     not @isLinewise()
 
-  setTextInRangeAndSelect: (range, text, selection) ->
-    newRange = @editor.setTextInBufferRange(range, text)
-    selection.setBufferRange(newRange)
-
-  complementSpacesToPoint: ({row, column}) ->
-    eol = @editor.bufferRangeForBufferRow(row).end
-    if (fillCount = column - eol.column) > 0
-      @insertTextAtPoint(eol, ' '.repeat(fillCount))
-
-  isMovable: (selection) ->
-    {start} = selection.getBufferRange()
-    switch @direction
-      when 'down', 'right' then true
-      when 'up' then start.row isnt 0
-      when 'left'
-        if @isLinewise() then true else start.column isnt 0
-
   execute: ->
     @withUndoJoin =>
-      selections = @editor.getSelectionsOrderedByBufferPosition()
-      return if @isCharacterwise() and (not @isMovable(selections[0]))
-      selections.reverse() if @direction is 'down'
       @editor.transact =>
-        @countTimes =>
-          @mutateSelections(selections)
-
-  mutateSelections: (selections) ->
-    for selection in selections when @isMovable(selection)
-      if @isLinewise()
-        @moveLinewise(selection)
-      else
-        @moveCharacterwise(selection)
+        selections = @editor.getSelectionsOrderedByBufferPosition()
+        @mutateSelections(selections)
 
   getInitialOverwrittenBySelection: ->
     overwrittenBySelection = new Map
@@ -145,8 +125,8 @@ class MoveSelectedText extends TransformString
     overwrittenBySelection
 
   withUndoJoin: (fn) ->
-    state = stateByEditor.get(@editor)
-    isSequential = state.selectedTexts is @getSelectedTexts()
+    state = @getState()
+    isSequential = state.selectedTexts is getSelectedTexts(@editor)
     unless isSequential
       state.checkpoint = @editor.createCheckpoint()
       state.overwrittenBySelection = null
@@ -156,7 +136,7 @@ class MoveSelectedText extends TransformString
 
     fn()
 
-    state.selectedTexts = @getSelectedTexts()
+    state.selectedTexts = getSelectedTexts(@editor)
     if isSequential
       @editor.groupChangesSinceCheckpoint(state.checkpoint)
 
@@ -166,7 +146,7 @@ class MoveSelectedText extends TransformString
   # - right: characterwise
   # - left: characterwise
   getOverwrittenForSelection: (selection, disappearing) ->
-    {overwrittenBySelection} = stateByEditor.get(@editor)
+    {overwrittenBySelection} = @getState()
     # overwrittenArea must mutated in-place.
     overwrittenArea = overwrittenBySelection.get(selection)
 
@@ -203,9 +183,7 @@ class MoveSelectedText extends TransformString
       when 'left' then [[0, -1], [0, 0]]
 
     if @direction is 'down' # auto insert new linew at last row
-      endRow = selection.getBufferRange().end.row
-      if endRow >= getVimLastBufferRow(@editor)
-        @insertTextAtPoint(@editor.getEofBufferPosition(), "\n")
+      extendLastBufferRowToRow(@editor, selection.getBufferRange().end.row)
 
     range = selection.getBufferRange().translate(translation...)
     selection.setBufferRange(range)
@@ -245,6 +223,25 @@ class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
   flashTarget: false
 
+  # Return 0 when no longer movable
+  getCount: =>
+    count = super
+    if @direction is 'up'
+      topSelection = @editor.getSelectionsOrderedByBufferPosition()[0]
+      startRow = topSelection.getBufferRange().start.row
+      Math.min(startRow, count)
+    else
+      count
+
+  mutateSelections: (selections) ->
+    selections.reverse() if @direction is 'down'
+    @countTimes =>
+      for selection in selections
+        if @isLinewise()
+          @moveLinewise(selection)
+        else
+          @moveCharacterwise(selection)
+
   moveLinewise: (selection) ->
     if @vimState.submode is 'linewise'
       @rotateTextForSelection(selection)
@@ -256,15 +253,16 @@ class MoveSelectedTextUp extends MoveSelectedText
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
     # Pre mutate
-    translation = switch @direction
-      when 'up' then [[-1, 0], [-1, 0]]
-      when 'down' then [[1, 0], [1, 0]]
+    rowDelta = switch @direction
+      when 'up' then -1
+      when 'down' then 1
 
     fromRange = selection.getBufferRange()
-    toRange = fromRange.translate(translation...)
+    toRange = fromRange.translate([rowDelta, 0])
 
+    extendLastBufferRowToRow(@editor, toRange.end.row)
     # Swap text from fromRange to toRange
-    @complementSpacesToPoint(toRange.end)
+    insertSpacesToPoint(@editor, toRange.end)
     movingText = @editor.getTextInBufferRange(fromRange)
     replacedText = @editor.getTextInBufferRange(toRange)
     replacedText = @getOverwrittenForSelection(selection, replacedText) if @isOverwrite()
@@ -276,27 +274,31 @@ class MoveSelectedTextUp extends MoveSelectedText
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
 
-class MoveSelectedTextRight extends MoveSelectedText
+class MoveSelectedTextRight extends MoveSelectedTextUp
   direction: 'right'
-  flashTarget: false
 
   moveLinewise: (selection) ->
-    switch @direction
-      when 'right' then selection.indentSelectedRows()
-      when 'left' then selection.outdentSelectedRows()
+    selection.indentSelectedRows()
 
   moveCharacterwise: (selection) ->
-    # automatically append space at EOL
-    if @direction is 'right'
-      eol = selection.getBufferRange().end
-      if pointIsAtEndOfLine(@editor, eol)
-        @insertTextAtPoint(eol, " ")
+    eol = selection.getBufferRange().end
+    if pointIsAtEndOfLine(@editor, eol)
+      insertTextAtPoint(@editor, eol, " ")
 
     @rotateTextForSelection(selection)
     @editor.scrollToCursorPosition({center: true})
 
 class MoveSelectedTextLeft extends MoveSelectedTextRight
   direction: 'left'
+
+  moveLinewise: (selection) ->
+    selection.outdentSelectedRows()
+
+  moveCharacterwise: (selection) ->
+    return if selection.getBufferRange().start.column is 0
+
+    @rotateTextForSelection(selection)
+    @editor.scrollToCursorPosition({center: true})
 
 # Duplicate
 # -------------------------
@@ -348,9 +350,7 @@ class DuplicateSelectedText extends MoveSelectedText
               @vimState.activate('visual', 'blockwise')
 
             bss = @vimState.getBlockwiseSelectionsOrderedByBufferPosition()
-            console.log bss.length
             bss.reverse() if @direction is 'down'
-            # console.log count
             for bs in bss
               @duplicateBlockwiseSelection(bs, count)
 
@@ -380,7 +380,7 @@ class DuplicateSelectedText extends MoveSelectedText
           [end, end]
       when 'left', 'right'
         selection.getBufferRange()
-    @setTextInRangeAndSelect(range, newText, selection)
+    setTextInRangeAndSelect(range, newText, selection)
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
   direction: 'up'
@@ -394,7 +394,7 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
       point = switch @direction
         when 'up' then [startRow - 1, Infinity]
         when 'down' then [endRow + 1, 0]
-      @insertTextAtPoint(point, "\n".repeat(height * count))
+      insertTextAtPoint(@editor, point, "\n".repeat(height * count))
 
     getTranslation = (direction, count) ->
       switch direction
@@ -406,7 +406,7 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
       selections.forEach (selection) =>
         translation = getTranslation(@direction, num)
         range = selection.getBufferRange().translate(translation)
-        @complementSpacesToPoint(range.start)
+        insertSpacesToPoint(@editor, range.start)
         ranges.push @editor.setTextInBufferRange(range, selection.getText())
     sortRanges(ranges)
     first = ranges[0]
@@ -437,7 +437,7 @@ class DuplicateSelectedTextRight extends DuplicateSelectedText
           [end, end.translate([0, +width])]
         else
           [end, end]
-    @setTextInRangeAndSelect(range, newText, selection)
+    setTextInRangeAndSelect(range, newText, selection)
 
 class DuplicateSelectedTextLeft extends DuplicateSelectedTextRight
   direction: 'left'
