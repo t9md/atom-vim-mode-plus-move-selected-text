@@ -1,8 +1,11 @@
+{Disposable} = require 'atom'
+
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
   require "#{packPath}/lib/#{path}"
 
 {getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
+swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
 sortRanges = (ranges) ->
   ranges.sort((a, b) -> a.compare(b))
@@ -21,19 +24,27 @@ setTextInRangeAndSelect = (range, text, selection) ->
 
 insertSpacesToPoint = (editor, {row, column}) ->
   eol = editor.bufferRangeForBufferRow(row).end
-  if (fillCount = column - eol.column) > 0
-    insertTextAtPoint(editor, eol, ' '.repeat(fillCount))
+  if (count = column - eol.column) > 0
+    insertTextAtPoint(editor, eol, ' '.repeat(count))
 
 extendLastBufferRowToRow = (editor, row) ->
-  if row >= getVimLastBufferRow(editor)
+  vimLastBufferRow = getVimLastBufferRow(editor)
+  if (count = row - vimLastBufferRow) > 0
     eof = editor.getEofBufferPosition()
-    insertTextAtPoint(editor, eof, "\n")
+    insertTextAtPoint(editor, eof, "\n".repeat(count))
 
 shift = (list, num) ->
   list.splice(0, num)
 
 pop = (list, num) ->
   list.splice(-num, num)
+
+# Return function to restore
+switchToLinewise = (selection) ->
+  swrap(selection).preserveCharacterwise()
+  swrap(selection).expandOverLine(preserveGoalColumn: true)
+  new Disposable ->
+    swrap(selection).restoreCharacterwise()
 
 module.exports = {
   sortRanges
@@ -43,6 +54,7 @@ module.exports = {
   setTextInRangeAndSelect
   insertSpacesToPoint
   extendLastBufferRowToRow
+  switchToLinewise
   shift
   pop
 }

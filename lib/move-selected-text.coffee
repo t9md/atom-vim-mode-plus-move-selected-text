@@ -45,7 +45,7 @@ _ = require 'underscore-plus'
   setTextInRangeAndSelect
   insertSpacesToPoint
   extendLastBufferRowToRow
-  countChar
+  switchToLinewise
 } = require './utils'
 {inspect} = require 'util'
 
@@ -67,6 +67,7 @@ disposableByEditor = new Map
 class MoveSelectedText extends TransformString
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
+  flashTarget: false
 
   initState: ->
     stateByEditor.set(@editor, new State())
@@ -102,14 +103,11 @@ class MoveSelectedText extends TransformString
         @editor.getSelections().some (selection) ->
           not swrap(selection).isSingleRow()
 
-  isCharacterwise: ->
-    not @isLinewise()
-
-  execute: ->
-    @withUndoJoin =>
-      @editor.transact =>
-        selections = @editor.getSelectionsOrderedByBufferPosition()
-        @mutateSelections(selections)
+  withLinewise: (fn) ->
+    unless @vimState.submode is 'linewise'
+      disposable = switchToLinewise(selection)
+    fn()
+    disposable?.dispose()
 
   getInitialOverwrittenBySelection: ->
     overwrittenBySelection = new Map
@@ -222,7 +220,6 @@ class MoveSelectedText extends TransformString
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
-  flashTarget: false
 
   # Return 0 when no longer movable
   getCount: =>
@@ -234,26 +231,25 @@ class MoveSelectedTextUp extends MoveSelectedText
     else
       count
 
-  mutateSelections: (selections) ->
-    selections.reverse() if @direction is 'down'
-    @countTimes =>
-      for selection in selections
-        if @isLinewise()
-          @moveLinewise(selection)
-        else
-          @moveCharacterwise(selection)
+  execute: ->
+    @withUndoJoin =>
+      selections = @editor.getSelectionsOrderedByBufferPosition()
+      selections.reverse() if @direction is 'down'
+      @editor.transact =>
+        @countTimes =>
+          for selection in selections
+            if @isLinewise()
+              @moveLinewise(selection)
+            else
+              @moveCharacterwise(selection)
 
   moveLinewise: (selection) ->
-    if @vimState.submode is 'linewise'
+    @withLinewise =>
       @rotateTextForSelection(selection)
-    else
-      swrap(selection).switchToLinewise =>
-        @rotateTextForSelection(selection)
     @editor.scrollToCursorPosition({center: true})
 
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
-    # Pre mutate
     rowDelta = switch @direction
       when 'up' then -1
       when 'down' then 1
@@ -334,32 +330,32 @@ class DuplicateSelectedText extends MoveSelectedText
     selections.reverse() if @direction is 'down'
     return if (count = @getCount()) is 0
     @editor.transact =>
-      if @isLinewise()
-        for selection in selections
-          if @vimState.submode is 'linewise'
-            @duplicateLinewise(selection, count)
-          else
-            swrap(selection).switchToLinewise =>
-              @duplicateLinewise(selection, count)
-      else
-        switch @direction
-          when 'right', 'left'
-            for selection in selections
-              @duplicateCharacterwise(selection, count)
-          when 'up', 'down'
-            if wasCharacterwise = @vimState.isMode('visual', 'characterwise')
-              @vimState.activate('visual', 'blockwise')
-
-            bss = @vimState.getBlockwiseSelectionsOrderedByBufferPosition()
-            bss.reverse() if @direction is 'down'
-            for bs in bss
-              @duplicateBlockwiseSelection(bs, count)
-
-            if wasCharacterwise
-              @vimState.activate('visual', 'characterwise')
+      for selection in selections
+        if @isLinewise()
+          @duplicateLinewise(selection, count)
+        else
+          @duplicateCharacterwise(selection, count)
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
   direction: 'up'
+  withBlockwise: (fn) ->
+    if wasCharacterwise = @vimState.isMode('visual', 'characterwise')
+      @vimState.activate('visual', 'blockwise')
+    fn()
+    if wasCharacterwise
+      @vimState.activate('visual', 'characterwise')
+
+  execute: ->
+    if @isLinewise()
+      super
+    else
+      @editor.transact =>
+        return if (count = @getCount()) is 0
+        @withBlockwise =>
+          bss = @vimState.getBlockwiseSelectionsOrderedByBufferPosition()
+          bss.reverse() if @direction is 'down'
+          for bs in bss
+            @duplicateCharacterwise(bs, count)
 
   duplicateLinewise: (selection, count) ->
     getText = ->
@@ -378,41 +374,51 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
           when 'up' then [start, start]
           when 'down' then [end, end]
 
-    text = getText()
-    range = getRangeToInsert(text)
-    setTextInRangeAndSelect(range, text, selection)
+    @withLinewise =>
+      text = getText()
+      range = getRangeToInsert(text)
+      setTextInRangeAndSelect(range, text, selection)
 
-  duplicateBlockwiseSelection: (blockwiseSelection, count) ->
+  duplicateCharacterwise: (blockwiseSelection, count)  ->
+    insertBlankLine = (amount) =>
+      [startRow, endRow] = blockwiseSelection.getBufferRowRange()
+      if @isOverwrite()
+        if @direction is 'down'
+          extendLastBufferRowToRow(@editor, endRow + amount + 1)
+      else
+        point = switch @direction
+          when 'up' then [startRow - 1, Infinity]
+          when 'down' then [endRow + 1, 0]
+        insertTextAtPoint(@editor, point, "\n".repeat(amount))
+
+    getRangeToInsert = (selection, count) =>
+      selection.getBufferRange().translate(
+        switch @direction
+          when 'up' then [-height * count, 0]
+          when 'down' then [+height * count, 0]
+        )
+
+    select = (ranges) =>
+      sortRanges(ranges)
+      first = ranges[0]
+      last = _.last(ranges)
+      blockwiseSelection.setBufferRange(
+        if blockwiseSelection.headReversedStateIsInSync()
+          new Range(first.start, last.end)
+        else
+          new Range(first.end, last.start).translate([0, -1], [0, +1])
+      )
+
     {selections} = blockwiseSelection
     height = blockwiseSelection.getHeight()
-
-    unless @isOverwrite() # Insert Blank row
-      [startRow, endRow] = blockwiseSelection.getBufferRowRange()
-      point = switch @direction
-        when 'up' then [startRow - 1, Infinity]
-        when 'down' then [endRow + 1, 0]
-      insertTextAtPoint(@editor, point, "\n".repeat(height * count))
-
-    getTranslation = (direction, count) ->
-      switch direction
-        when 'up' then [-height * count, 0]
-        when 'down' then [+height * count, 0]
-
+    insertBlankLine(height * count)
     ranges = []
     for num in [1..count]
       selections.forEach (selection) =>
-        translation = getTranslation(@direction, num)
-        range = selection.getBufferRange().translate(translation)
+        range = getRangeToInsert(selection, count)
         insertSpacesToPoint(@editor, range.start)
         ranges.push @editor.setTextInBufferRange(range, selection.getText())
-    sortRanges(ranges)
-    first = ranges[0]
-    last = _.last(ranges)
-    range = if blockwiseSelection.headReversedStateIsInSync()
-      new Range(first.start, last.end)
-    else
-      new Range(first.end, last.start).translate([0, -1], [0, +1])
-    blockwiseSelection.setBufferRange(range)
+    select(ranges)
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
   direction: 'down'
@@ -426,9 +432,10 @@ class DuplicateSelectedTextRight extends DuplicateSelectedText
         .map (text) -> text.repeat(count+1)
         .join("\n") + "\n"
 
-    text = getText()
-    range = selection.getBufferRange()
-    setTextInRangeAndSelect(range, text, selection)
+    @withLinewise =>
+      text = getText()
+      range = selection.getBufferRange()
+      setTextInRangeAndSelect(range, text, selection)
 
   duplicateCharacterwise: (selection, count) ->
     getRangeToInsert = (text) =>
