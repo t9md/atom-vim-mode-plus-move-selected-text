@@ -1,44 +1,6 @@
-# Moving strategy
-# -------------------------
-# Two wise. correspoinding submode of visual-mode is below
-#  - Linewise: linewise, characterwise(in case some selection is multi-row)
-#  - Characterwise: characterwise(in case all selection is single-row), blockwise
-#
-# Four direction
-#   ['up', 'down', 'right', 'left']
-#
-# Movability
-#  up
-#    - Linewise: can't move upward if row is 0
-#    - Characterwise: can't move upward if top selection is at row 0
-#  down
-#    - Linewise: always movable since last row is automatically extended.
-#    - Characterwise: always movable since last row is automatically extended.
-#  right
-#    - Linewise: always movable since EOL is automatically extended.
-#    - Characterwise: always movable since EOL is automatically extended.
-#  left
-#    - Linewise: always true since indent/outdent command can handle it.
-#    - Characterwise: can't move if start of selection is at column 0
-#
-# Moving method
-#  up
-#    - Linewise: rotate linewise
-#    - Characterwise: swap single-row selection with upper block
-#  down
-#    - Linewise: rotate linewise
-#    - Characterwise: swap single-row selection with lower block
-#  right
-#    - Linewise: indent line
-#    - Characterwise: rotate charater in single-row selection.
-#  left
-#    - Linewise: outdent line
-#    - Characterwise: rotate charater in single-row selection.
-
 _ = require 'underscore-plus'
 {CompositeDisposable, Range, Point} = require 'atom'
 {
-  sortRanges
   requireFrom
   getSelectedTexts
   insertTextAtPoint
@@ -353,12 +315,14 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
       @editor.transact =>
         return if (count = @getCount()) is 0
         @withBlockwise =>
-          # if @direction is 'down'
-          #   bottom = _.last(@editor.getSelectionsOrderedByBufferPosition())
-          #   preservedRange = bottom.getBufferRange()
-          #   ensureBufferEndWithNewLine(@editor)
-          #   bottom.setBufferRange(preservedRange)
-          #   # extendLastBufferRowToRow(@editor, selection.getBufferRange().end.row)
+          if @direction is 'down'
+            bottom = _.last(@editor.getSelectionsOrderedByBufferPosition())
+            range = bottom.getBufferRange()
+            if range.end.row is @editor.getLastBufferRow()
+              # Since inserting new line modify selected range
+              # We have to revert selction range to preserved one.
+              ensureBufferEndWithNewLine(@editor)
+              bottom.setBufferRange(range)
 
           bss = @vimState.getBlockwiseSelectionsOrderedByBufferPosition()
           bss.reverse() if @direction is 'down'
@@ -393,10 +357,8 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     insertBlankLine = (amount) =>
       [startRow, endRow] = blockwiseSelection.getBufferRowRange()
       if @isOverwrite()
-        # if and @direction is 'down'
-        null
-        # console.log endRow + amount
-        # extendLastBufferRowToRow(@editor, endRow + amount)
+        if @direction is 'down'
+          extendLastBufferRowToRow(@editor, endRow + amount)
       else
         point = switch @direction
           when 'up' then [startRow - 1, Infinity]
@@ -426,12 +388,11 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     insertBlankLine(height * count)
 
     ranges = []
-    texts = (selection.getText() for selection in selections)
-    for num in [1..count]
+    @countTimes (num) =>
       selections.forEach (selection, i) =>
         range = getRangeToInsert(selection, num)
         insertSpacesToPoint(@editor, range.start)
-        ranges.push @editor.setTextInBufferRange(range, texts[i])
+        ranges.push @editor.setTextInBufferRange(range, selection.getText())
     select(ranges)
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp

@@ -7,9 +7,6 @@ requireFrom = (pack, path) ->
 {getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
-sortRanges = (ranges) ->
-  ranges.sort((a, b) -> a.compare(b))
-
 getSelectedTexts = (editor) ->
   texts = (selection.getText() for selection in editor.getSelections())
   texts.join("\n")
@@ -52,7 +49,6 @@ switchToLinewise = (selection) ->
     swrap(selection).restoreCharacterwise()
 
 module.exports = {
-  sortRanges
   requireFrom
   getSelectedTexts
   insertTextAtPoint
