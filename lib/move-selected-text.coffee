@@ -26,6 +26,26 @@ class MoveSelectedText extends TransformString
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
 
+  isOverwrite: ->
+    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+
+  isLinewise: ->
+    switch @vimState.submode
+      when 'linewise' then true
+      when 'blockwise' then false
+      when 'characterwise'
+        @editor.getSelections().some (selection) ->
+          not swrap(selection).isSingleRow()
+
+  withLinewise: (selection, fn) ->
+    unless @vimState.submode is 'linewise'
+      disposable = switchToLinewise(selection)
+    fn(selection)
+    disposable?.dispose()
+
+class MoveSelectedTextUp extends MoveSelectedText
+  direction: 'up'
+
   initState: ->
     stateByEditor.set(@editor, new State())
 
@@ -48,23 +68,6 @@ class MoveSelectedText extends TransformString
         disposable.dispose()
         disposableByEditor.delete(@editor)
         @removeState()
-
-  isOverwrite: ->
-    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
-
-  isLinewise: ->
-    switch @vimState.submode
-      when 'linewise' then true
-      when 'blockwise' then false
-      when 'characterwise'
-        @editor.getSelections().some (selection) ->
-          not swrap(selection).isSingleRow()
-
-  withLinewise: (selection, fn) ->
-    unless @vimState.submode is 'linewise'
-      disposable = switchToLinewise(selection)
-    fn(selection)
-    disposable?.dispose()
 
   getInitialOverwrittenBySelection: ->
     overwrittenBySelection = new Map
@@ -174,9 +177,6 @@ class MoveSelectedText extends TransformString
         overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
         text.unshift(overwritten)
         text
-
-class MoveSelectedTextUp extends MoveSelectedText
-  direction: 'up'
 
   # Return 0 when no longer movable
   getCount: =>
