@@ -46,10 +46,11 @@ _ = require 'underscore-plus'
   insertSpacesToPoint
   extendLastBufferRowToRow
   switchToLinewise
+  ensureBufferEndWithNewLine
 } = require './utils'
 {inspect} = require 'util'
 
-{pointIsAtEndOfLine, sortRanges} = requireFrom('vim-mode-plus', 'utils')
+{pointIsAtEndOfLine, sortRanges, getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 Base = requireFrom('vim-mode-plus', 'base')
 TransformString = Base.getClass('Operator')
@@ -346,12 +347,19 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
       @vimState.activate('visual', 'characterwise')
 
   execute: ->
-    if @isLinewise()
+    if @isLinewise() or (not @isLinewise() and (@direction in ['right', 'left']))
       super
     else
       @editor.transact =>
         return if (count = @getCount()) is 0
         @withBlockwise =>
+          # if @direction is 'down'
+          #   bottom = _.last(@editor.getSelectionsOrderedByBufferPosition())
+          #   preservedRange = bottom.getBufferRange()
+          #   ensureBufferEndWithNewLine(@editor)
+          #   bottom.setBufferRange(preservedRange)
+          #   # extendLastBufferRowToRow(@editor, selection.getBufferRange().end.row)
+
           bss = @vimState.getBlockwiseSelectionsOrderedByBufferPosition()
           bss.reverse() if @direction is 'down'
           for bs in bss
@@ -364,6 +372,8 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
 
     getRangeToInsert = (text) =>
       {start, end} = selection.getBufferRange()
+      if @direction is 'down' and end.isEqual(@editor.getEofBufferPosition())
+        end = ensureBufferEndWithNewLine(@editor)
       if @isOverwrite()
         height = text.split("\n").length - 1
         switch @direction
@@ -383,8 +393,10 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     insertBlankLine = (amount) =>
       [startRow, endRow] = blockwiseSelection.getBufferRowRange()
       if @isOverwrite()
-        if @direction is 'down'
-          extendLastBufferRowToRow(@editor, endRow + amount + 1)
+        # if and @direction is 'down'
+        null
+        # console.log endRow + amount
+        # extendLastBufferRowToRow(@editor, endRow + amount)
       else
         point = switch @direction
           when 'up' then [startRow - 1, Infinity]
@@ -412,18 +424,20 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     {selections} = blockwiseSelection
     height = blockwiseSelection.getHeight()
     insertBlankLine(height * count)
+
     ranges = []
+    texts = (selection.getText() for selection in selections)
     for num in [1..count]
-      selections.forEach (selection) =>
-        range = getRangeToInsert(selection, count)
+      selections.forEach (selection, i) =>
+        range = getRangeToInsert(selection, num)
         insertSpacesToPoint(@editor, range.start)
-        ranges.push @editor.setTextInBufferRange(range, selection.getText())
+        ranges.push @editor.setTextInBufferRange(range, texts[i])
     select(ranges)
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
   direction: 'down'
 
-class DuplicateSelectedTextRight extends DuplicateSelectedText
+class DuplicateSelectedTextRight extends DuplicateSelectedTextUp
   direction: 'right'
 
   duplicateLinewise: (selection, count) ->
@@ -444,7 +458,7 @@ class DuplicateSelectedTextRight extends DuplicateSelectedText
         width = text.length
         switch @direction
           when 'right' then [end, end.translate([0, +width])]
-          when 'left' then [start, start.translate([0, +width])]
+          when 'left' then [start.translate([0, -width]), start]
       else
         switch @direction
           when 'right' then [end, end]

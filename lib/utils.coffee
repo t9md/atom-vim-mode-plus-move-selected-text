@@ -28,10 +28,15 @@ insertSpacesToPoint = (editor, {row, column}) ->
     insertTextAtPoint(editor, eol, ' '.repeat(count))
 
 extendLastBufferRowToRow = (editor, row) ->
-  vimLastBufferRow = getVimLastBufferRow(editor)
-  if (count = row - vimLastBufferRow) > 0
+  if (count = row - editor.getLastBufferRow()) > 0
     eof = editor.getEofBufferPosition()
     insertTextAtPoint(editor, eof, "\n".repeat(count))
+
+# Return new EOF
+ensureBufferEndWithNewLine = (editor) ->
+  eof = editor.getEofBufferPosition()
+  insertTextAtPoint(editor, eof, "\n") unless eof.column is 0
+  editor.getEofBufferPosition()
 
 shift = (list, num) ->
   list.splice(0, num)
@@ -54,6 +59,7 @@ module.exports = {
   setTextInRangeAndSelect
   insertSpacesToPoint
   extendLastBufferRowToRow
+  ensureBufferEndWithNewLine
   switchToLinewise
   shift
   pop
