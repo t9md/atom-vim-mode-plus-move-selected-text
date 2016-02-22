@@ -1,7 +1,7 @@
 {
   "name": "vim-mode-plus-move-selected-text",
   "main": "./lib/main",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Move selected text like object",
   "repository": "https://github.com/t9md/atom-vim-mode-plus-move-selected-text",
   "license": "MIT",
