@@ -1,18 +1,12 @@
 _ = require 'underscore-plus'
 {CompositeDisposable, Range, Point} = require 'atom'
 {
-  requireFrom
-  getSelectedTexts
-  insertTextAtPoint
-  setTextInRangeAndSelect
-  insertSpacesToPoint
-  extendLastBufferRowToRow
-  switchToLinewise
-  ensureBufferEndWithNewLine
+  requireFrom, getSelectedTexts, insertTextAtPoint, setTextInRangeAndSelect,
+  insertSpacesToPoint, extendLastBufferRowToRow, switchToLinewise,
+  ensureBufferEndWithNewLine,
 } = require './utils'
-{inspect} = require 'util'
 
-{pointIsAtEndOfLine, sortRanges, getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
+{pointIsAtEndOfLine, sortRanges} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 Base = requireFrom('vim-mode-plus', 'base')
 TransformString = Base.getClass('Operator')
@@ -66,10 +60,10 @@ class MoveSelectedText extends TransformString
         @editor.getSelections().some (selection) ->
           not swrap(selection).isSingleRow()
 
-  withLinewise: (fn) ->
+  withLinewise: (selection, fn) ->
     unless @vimState.submode is 'linewise'
       disposable = switchToLinewise(selection)
-    fn()
+    fn(selection)
     disposable?.dispose()
 
   getInitialOverwrittenBySelection: ->
@@ -207,7 +201,7 @@ class MoveSelectedTextUp extends MoveSelectedText
               @moveCharacterwise(selection)
 
   moveLinewise: (selection) ->
-    @withLinewise =>
+    @withLinewise selection, =>
       @rotateTextForSelection(selection)
     @editor.scrollToCursorPosition({center: true})
 
@@ -234,7 +228,19 @@ class MoveSelectedTextUp extends MoveSelectedText
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
 
-class MoveSelectedTextRight extends MoveSelectedTextUp
+class MoveSelectedTextLeft extends MoveSelectedTextUp
+  direction: 'left'
+
+  moveLinewise: (selection) ->
+    selection.outdentSelectedRows()
+
+  moveCharacterwise: (selection) ->
+    return if selection.getBufferRange().start.column is 0
+
+    @rotateTextForSelection(selection)
+    @editor.scrollToCursorPosition({center: true})
+
+class MoveSelectedTextRight extends MoveSelectedTextLeft
   direction: 'right'
 
   moveLinewise: (selection) ->
@@ -244,18 +250,6 @@ class MoveSelectedTextRight extends MoveSelectedTextUp
     eol = selection.getBufferRange().end
     if pointIsAtEndOfLine(@editor, eol)
       insertTextAtPoint(@editor, eol, " ")
-
-    @rotateTextForSelection(selection)
-    @editor.scrollToCursorPosition({center: true})
-
-class MoveSelectedTextLeft extends MoveSelectedTextRight
-  direction: 'left'
-
-  moveLinewise: (selection) ->
-    selection.outdentSelectedRows()
-
-  moveCharacterwise: (selection) ->
-    return if selection.getBufferRange().start.column is 0
 
     @rotateTextForSelection(selection)
     @editor.scrollToCursorPosition({center: true})
@@ -348,7 +342,7 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
           when 'up' then [start, start]
           when 'down' then [end, end]
 
-    @withLinewise =>
+    @withLinewise selection, =>
       text = getText()
       range = getRangeToInsert(text)
       setTextInRangeAndSelect(range, text, selection)
@@ -398,8 +392,8 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
   direction: 'down'
 
-class DuplicateSelectedTextRight extends DuplicateSelectedTextUp
-  direction: 'right'
+class DuplicateSelectedTextLeft extends DuplicateSelectedTextUp
+  direction: 'left'
 
   duplicateLinewise: (selection, count) ->
     getText = ->
@@ -407,7 +401,7 @@ class DuplicateSelectedTextRight extends DuplicateSelectedTextUp
         .map (text) -> text.repeat(count+1)
         .join("\n") + "\n"
 
-    @withLinewise =>
+    @withLinewise selection, =>
       text = getText()
       range = selection.getBufferRange()
       setTextInRangeAndSelect(range, text, selection)
@@ -429,13 +423,13 @@ class DuplicateSelectedTextRight extends DuplicateSelectedTextUp
     range = getRangeToInsert(text)
     setTextInRangeAndSelect(range, text, selection)
 
-class DuplicateSelectedTextLeft extends DuplicateSelectedTextRight
-  direction: 'left'
+class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
+  direction: 'right'
 
 module.exports = {
-  MoveSelectedTextDown, MoveSelectedTextUp
-  MoveSelectedTextRight, MoveSelectedTextLeft
+  MoveSelectedTextUp, MoveSelectedTextDown
+  MoveSelectedTextLeft, MoveSelectedTextRight
 
-  DuplicateSelectedTextDown, DuplicateSelectedTextUp
-  DuplicateSelectedTextRight, DuplicateSelectedTextLeft
+  DuplicateSelectedTextUp, DuplicateSelectedTextDown
+  DuplicateSelectedTextLeft, DuplicateSelectedTextRight
 }

@@ -4,7 +4,6 @@ requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
   require "#{packPath}/lib/#{path}"
 
-{getVimLastBufferRow} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
 getSelectedTexts = (editor) ->
