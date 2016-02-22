@@ -8,6 +8,7 @@ _ = require 'underscore-plus'
 
 {pointIsAtEndOfLine, sortRanges} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
+BlockwiseSelection = requireFrom('vim-mode-plus', 'blockwise-selection')
 Base = requireFrom('vim-mode-plus', 'base')
 TransformString = Base.getClass('Operator')
 
@@ -299,7 +300,8 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     if wasCharacterwise = @vimState.isMode('visual', 'characterwise')
       @vimState.activate('visual', 'blockwise')
     fn()
-    if wasCharacterwise
+    if wasCharacterwise and
+        @vimState.getBlockwiseSelections().every((bs) -> bs.getHeight() is 1)
       @vimState.activate('visual', 'characterwise')
 
   execute: ->
