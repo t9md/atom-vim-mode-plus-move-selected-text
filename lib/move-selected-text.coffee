@@ -367,26 +367,21 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
         )
 
     select = (ranges) =>
-      sortRanges(ranges)
-      first = ranges[0]
-      last = _.last(ranges)
-      blockwiseSelection.setBufferRange(
-        if blockwiseSelection.headReversedStateIsInSync()
-          new Range(first.start, last.end)
-        else
-          new Range(first.end, last.start).translate([0, -1], [0, +1])
-      )
+      head = blockwiseSelection.getHead()
+      wasReversed = blockwiseSelection.isReversed()
+      blockwiseSelection.setSelectedBufferRanges(ranges, {reversed: head.isReversed()})
+      blockwiseSelection.reverse() if wasReversed
 
-    {selections} = blockwiseSelection
     height = blockwiseSelection.getHeight()
     insertBlankLine(height * count)
 
     ranges = []
     @countTimes (num) =>
-      selections.forEach (selection, i) =>
+      for selection, i in blockwiseSelection.selections
+        text = selection.getText()
         range = getRangeToInsert(selection, num)
         insertSpacesToPoint(@editor, range.start)
-        ranges.push @editor.setTextInBufferRange(range, selection.getText())
+        ranges.push @editor.setTextInBufferRange(range, text)
     select(ranges)
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp

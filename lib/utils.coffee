@@ -15,8 +15,7 @@ insertTextAtPoint = (editor, point, text) ->
 
 setTextInRangeAndSelect = (range, text, selection) ->
   {editor} = selection
-  newRange = editor.setTextInBufferRange(range, text)
-  selection.setBufferRange(newRange)
+  selection.setBufferRange(editor.setTextInBufferRange(range, text))
 
 insertSpacesToPoint = (editor, {row, column}) ->
   eol = editor.bufferRangeForBufferRow(row).end
