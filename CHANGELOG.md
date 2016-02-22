@@ -1,3 +1,6 @@
+## 0.4.0
+- New: full support duplicate operation.
+
 ## 0.3.0
 - New: Support overwrite mode.
 - Improve: Lots of bug fix, refactoring.
