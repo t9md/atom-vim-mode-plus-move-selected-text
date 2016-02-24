@@ -46,6 +46,13 @@ switchToLinewise = (selection) ->
   new Disposable ->
     swrap(selection).restoreCharacterwise()
 
+opposite = (direction) ->
+  switch direction
+    when 'up' then 'down'
+    when 'down' then 'up'
+    when 'left' then 'right'
+    when 'right' then 'left'
+
 module.exports = {
   requireFrom
   getSelectedTexts
@@ -57,4 +64,5 @@ module.exports = {
   switchToLinewise
   shift
   pop
+  opposite
 }

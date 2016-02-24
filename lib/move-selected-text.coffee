@@ -4,7 +4,10 @@ _ = require 'underscore-plus'
   requireFrom, getSelectedTexts, insertTextAtPoint, setTextInRangeAndSelect,
   insertSpacesToPoint, extendLastBufferRowToRow, switchToLinewise,
   ensureBufferEndWithNewLine,
+  opposite
 } = require './utils'
+{inspect} = require 'util'
+Area = require './area'
 
 {pointIsAtEndOfLine, sortRanges} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
@@ -76,12 +79,12 @@ class MoveSelectedTextUp extends MoveSelectedText
     @editor.getSelections().forEach (selection) ->
       data =
         if isLinewise
-          height = swrap(selection).getRows().length
+          height = swrap(selection).getRowCount()
           Array(height).fill('')
         else
           width = selection.getBufferRange().getExtent().column
           [' '.repeat(width)]
-      overwrittenBySelection.set(selection, data)
+      overwrittenBySelection.set(selection, new Area(data))
     overwrittenBySelection
 
   withUndoJoin: (fn) ->
@@ -90,43 +93,12 @@ class MoveSelectedTextUp extends MoveSelectedText
     unless isSequential
       state.checkpoint = @editor.createCheckpoint()
       state.overwrittenBySelection = null
-
     unless state.overwrittenBySelection?
       state.overwrittenBySelection = @getInitialOverwrittenBySelection()
-
     fn()
-
     state.selectedTexts = getSelectedTexts(@editor)
     if isSequential
       @editor.groupChangesSinceCheckpoint(state.checkpoint)
-
-  # Used by
-  # - up: linewise, characterwise
-  # - down: linewise, characterwise
-  # - right: characterwise
-  # - left: characterwise
-  getOverwrittenForSelection: (selection, disappearing) ->
-    {overwrittenBySelection} = @getState()
-    # overwrittenArea must mutated in-place.
-    overwrittenArea = overwrittenBySelection.get(selection)
-
-    switch @direction
-      when 'up'
-        overwrittenArea.push(disappearing)
-        overwrittenArea.shift()
-      when 'down'
-        overwrittenArea.unshift(disappearing)
-        overwrittenArea.pop()
-      when 'left'
-        characters = overwrittenArea[0].split('')
-        appearing = characters.pop()
-        overwrittenArea.splice(0, Infinity, disappearing + characters.join(""))
-        appearing
-      when 'right'
-        characters = overwrittenArea[0].split('')
-        appearing = characters.shift()
-        overwrittenArea.splice(0, Infinity, characters.join("") + disappearing)
-        appearing
 
   # Used by
   # - up: linewise
@@ -135,7 +107,6 @@ class MoveSelectedTextUp extends MoveSelectedText
   # - left: characterwise
   rotateTextForSelection: (selection) ->
     reversed = selection.isReversed()
-    # Pre mutate
     translation = switch @direction
       when 'up' then [[-1, 0], [0, 0]]
       when 'down' then [[0, 0], [1, 0]]
@@ -146,38 +117,13 @@ class MoveSelectedTextUp extends MoveSelectedText
       extendLastBufferRowToRow(@editor, selection.getBufferRange().end.row)
 
     range = selection.getBufferRange().translate(translation...)
-    selection.setBufferRange(range)
-
-    text = switch @direction
-      when 'up', 'down' then swrap(selection).lineTextForBufferRows()
-      when 'right', 'left' then selection.getText().split('')
-
-    newText = if @isLinewise()
-      @rotateText(text, selection).join("\n") + "\n"
-    else
-      @rotateText(text, selection).join("")
-
-    range = selection.insertText(newText)
+    text = @editor.getTextInBufferRange(range)
+    if @isOverwrite()
+      overwrittenArea = @getState().overwrittenBySelection.get(selection)
+    area = new Area(text, @isLinewise(), overwrittenArea)
+    range = @editor.setTextInBufferRange(range, area.getTextByRotate(@direction))
     range = range.translate(translation.reverse()...)
     selection.setBufferRange(range, {reversed})
-
-  # Used by
-  # - up: linewise
-  # - down: linewise
-  # - right: characterwise
-  # - left: characterwise
-  rotateText: (text, selection) ->
-    switch @direction
-      when 'up', 'left'
-        overwritten = text.shift()
-        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
-        text.push(overwritten)
-        text
-      when 'down', 'right'
-        overwritten = text.pop()
-        overwritten = @getOverwrittenForSelection(selection, overwritten) if @isOverwrite()
-        text.unshift(overwritten)
-        text
 
   # Return 0 when no longer movable
   getCount: =>
@@ -208,19 +154,22 @@ class MoveSelectedTextUp extends MoveSelectedText
 
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
-    rowDelta = switch @direction
-      when 'up' then -1
-      when 'down' then 1
+    translation = switch @direction
+      when 'up' then [[-1, 0]]
+      when 'down' then [[+1, 0]]
 
     fromRange = selection.getBufferRange()
-    toRange = fromRange.translate([rowDelta, 0])
+    toRange = fromRange.translate(translation...)
 
     extendLastBufferRowToRow(@editor, toRange.end.row)
     # Swap text from fromRange to toRange
     insertSpacesToPoint(@editor, toRange.end)
     movingText = @editor.getTextInBufferRange(fromRange)
     replacedText = @editor.getTextInBufferRange(toRange)
-    replacedText = @getOverwrittenForSelection(selection, replacedText) if @isOverwrite()
+
+    if @isOverwrite()
+      area = @getState().overwrittenBySelection.get(selection)
+      replacedText = area.pushOut(replacedText, opposite(@direction))
     @editor.setTextInBufferRange(fromRange, replacedText)
     @editor.setTextInBufferRange(toRange, movingText)
 
