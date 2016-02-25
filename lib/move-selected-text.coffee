@@ -75,16 +75,19 @@ class MoveSelectedTextUp extends MoveSelectedText
 
   getInitialOverwrittenBySelection: ->
     overwrittenBySelection = new Map
-    isLinewise = @isLinewise()
-    @editor.getSelections().forEach (selection) ->
-      data =
-        if isLinewise
-          height = swrap(selection).getRowCount()
-          Array(height).fill('')
-        else
-          width = selection.getBufferRange().getExtent().column
-          [' '.repeat(width)]
-      overwrittenBySelection.set(selection, new Area(data))
+
+    getInitalAreaForSelection = (selection) =>
+      text = if @isLinewise()
+        height = swrap(selection).getRowCount()
+        "\n".repeat(height)
+      else
+        width = selection.getBufferRange().getExtent().column
+        ' '.repeat(width)
+      new Area(text, @isLinewise())
+
+    for selection in @editor.getSelections()
+      area = getInitalAreaForSelection(selection)
+      overwrittenBySelection.set(selection, area)
     overwrittenBySelection
 
   withUndoJoin: (fn) ->
@@ -117,10 +120,9 @@ class MoveSelectedTextUp extends MoveSelectedText
       extendLastBufferRowToRow(@editor, selection.getBufferRange().end.row)
 
     range = selection.getBufferRange().translate(translation...)
-    text = @editor.getTextInBufferRange(range)
     if @isOverwrite()
       overwrittenArea = @getState().overwrittenBySelection.get(selection)
-    area = new Area(text, @isLinewise(), overwrittenArea)
+    area = new Area(@editor.getTextInBufferRange(range), @isLinewise(), overwrittenArea)
     range = @editor.setTextInBufferRange(range, area.getTextByRotate(@direction))
     range = range.translate(translation.reverse()...)
     selection.setBufferRange(range, {reversed})

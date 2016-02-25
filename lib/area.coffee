@@ -1,4 +1,5 @@
 {opposite} = require './utils'
+{inspect} = require 'util'
 
 class Area
   data: null
@@ -10,7 +11,7 @@ class Area
       text.pop()
       @data = text
     else
-      @data = text
+      @data = [text]
 
   isLinewise: ->
     @linewise
@@ -23,10 +24,11 @@ class Area
     @getText()
 
   getText: ->
+    text = @getData().join("\n")
     if @isLinewise()
-      @getData().join("\n") + "\n"
+      text + "\n"
     else
-      @getData()
+      text
 
   rotate: (direction) ->
     switch direction
@@ -39,13 +41,13 @@ class Area
         text = @overwrittenArea.pushOut(text, opposite(direction)) if @overwrittenArea?
         @data.unshift(text)
       when 'right'
-        [other..., text] = @data
+        [other..., text] = @data[0]
         text = @overwrittenArea.pushOut(text, opposite(direction)) if @overwrittenArea?
-        @data = [text, other...].join("")
+        @data[0] = [text, other...].join("")
       when 'left'
-        [text, other...,] = @data
+        [text, other...,] = @data[0]
         text = @overwrittenArea.pushOut(text, opposite(direction)) if @overwrittenArea?
-        @data = [other..., text].join("")
+        @data[0] = [other..., text].join("")
 
   pushOut: (value, direction) ->
     switch direction
