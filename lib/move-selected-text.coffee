@@ -116,10 +116,14 @@ class MoveSelectedTextUp extends MoveSelectedText
       when 'right' then [[0, 0], [0, +1]]
       when 'left' then [[0, -1], [0, 0]]
 
-    if @direction is 'down' # auto insert new linew at last row
-      extendLastBufferRowToRow(@editor, selection.getBufferRange().end.row)
+    if @direction is 'down'
+      if selection.getBufferRange().end.row is @editor.getLastBufferRow()
+        ensureBufferEndWithNewLine(@editor)
 
     range = selection.getBufferRange().translate(translation...)
+    if @direction is 'down' # auto insert new linew at last row
+      extendLastBufferRowToRow(@editor, range.end.row)
+
     if @isOverwrite()
       overwrittenArea = @getState().overwrittenBySelection.get(selection)
     area = new Area(@editor.getTextInBufferRange(range), @isLinewise(), overwrittenArea)

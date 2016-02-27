@@ -7,9 +7,7 @@ class Area
 
   constructor: (text, @linewise=false, @overwrittenArea) ->
     if @linewise
-      text = text.split("\n")
-      text.pop()
-      @data = text
+      @data = text.replace(/\n$/, '').split("\n")
     else
       @data = [text]
 
