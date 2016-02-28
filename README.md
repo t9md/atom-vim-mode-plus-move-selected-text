@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/t9md/atom-vim-mode-plus-jasmine-increase-focus.svg?branch=master)](https://travis-ci.org/t9md/atom-vim-mode-plus-jasmine-increase-focus)
+[![Build Status](https://travis-ci.org/t9md/atom-vim-mode-plus-move-selected-text.svg?branch=master)](https://travis-ci.org/t9md/atom-vim-mode-plus-move-selected-text)
 
 # vim-mode-plus-move-selected-text
 
