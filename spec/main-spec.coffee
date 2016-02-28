@@ -179,6 +179,49 @@ describe "vim-mode-plus-move-selected-text", ->
         ensureLinewiseMove ["2", {ctrl: 'j'}], rows: [1, 2, 0]
         ensureLinewiseMove ["2", {ctrl: 'k'}], rows: [0, 1, 2]
 
+    describe "characterwise", ->
+      beforeEach ->
+        set
+          text: """
+          ooo
+          xxx
+          YYY
+          ZZZ
+
+          """
+          cursor: [[0, 1], [2, 1]]
+      it "move characterwise, support multiple selection", ->
+        ensure 'vl',
+          mode: ['visual', 'characterwise']
+          selectedTextOrdered: ['oo', 'YY']
+          selectedBufferRange: [
+            [[0, 1], [0, 3]]
+            [[2, 1], [2, 3]]
+          ]
+        ensure {ctrl: 'j'},
+          selectedTextOrdered: ['oo', 'YY']
+          selectedBufferRange: [
+            [[1, 1], [1, 3]]
+            [[3, 1], [3, 3]]
+          ]
+          text: """
+          oxx
+          xoo
+          YZZ
+          ZYY
+
+          """
+        ensure {ctrl: 'j'},
+          selectedTextOrdered: ['oo', 'YY']
+          text: """
+          oxx
+          xZZ
+          Yoo
+          Z__
+           YY
+          """.replace(/_/g, ' ')
+
+
   describe "move left/right", ->
     textData = null
     describe "linewise", ->
