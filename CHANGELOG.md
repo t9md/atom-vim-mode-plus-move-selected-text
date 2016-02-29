@@ -1,3 +1,7 @@
+## 0.4.1
+- Fix: linewise move-down didn't extend EOF.
+- Spec: Add spec 30% done.
+
 ## 0.4.0
 - New: full support duplicate operation.
 
