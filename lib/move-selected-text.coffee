@@ -225,7 +225,7 @@ class DuplicateSelectedText extends MoveSelectedText
           count = Math.min([count, counts...]...)
         else if @vimState.isMode('visual', 'blockwise')
           counts = @vimState.getBlockwiseSelections().map (bs) ->
-            {start} = bs.getTop().getBufferRange()
+            {start} = bs.getStartSelection().getBufferRange()
             Math.floor(start.row / bs.getHeight())
           count = Math.min([count, counts...]...)
       when 'left'
@@ -299,7 +299,7 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
           when 'up' then [start, start]
           when 'down' then [end, end]
 
-    @withLinewise selection, =>
+    @withLinewise selection, ->
       text = getText()
       range = getRangeToInsert(text)
       setTextInRangeAndSelect(range, text, selection)
@@ -323,8 +323,8 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
           when 'down' then [+height * count, 0]
         )
 
-    select = (ranges) =>
-      head = blockwiseSelection.getHead()
+    select = (ranges) ->
+      head = blockwiseSelection.getHeadSelection()
       wasReversed = blockwiseSelection.isReversed()
       blockwiseSelection.setSelectedBufferRanges(ranges, {reversed: head.isReversed()})
       blockwiseSelection.reverse() if wasReversed
