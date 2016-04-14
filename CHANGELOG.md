@@ -1,3 +1,6 @@
+## 0.5.0
+- Update to support vmp v0.33.0
+
 ## 0.4.1
 - Fix: linewise move-down didn't extend EOF.
 - Spec: Add spec 30% done.
