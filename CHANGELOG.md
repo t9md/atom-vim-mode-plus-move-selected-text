@@ -1,3 +1,6 @@
+## 0.6.0
+- Breaking: Rename `toggle-overwrite` to `move-selected-text-toggle-overwrite`.
+
 ## 0.5.0
 - Update to support vmp v0.33.0
 

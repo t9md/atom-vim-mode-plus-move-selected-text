@@ -34,7 +34,7 @@ Set following keymap to in your `keymap.cson`.
 
 ```coffeescipt
 'atom-text-editor.vim-mode-plus.visual-mode':
-  'ctrl-t': 'vim-mode-plus-user:toggle-overwrite'
+  'ctrl-t': 'vim-mode-plus-user:move-selected-text-toggle-overwrite'
 
   'ctrl-k': 'vim-mode-plus-user:move-selected-text-up'
   'ctrl-j': 'vim-mode-plus-user:move-selected-text-down'

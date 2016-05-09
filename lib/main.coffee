@@ -26,7 +26,7 @@ module.exports =
         editorElement.classList.toggle(OverwriteClass, newValue)
 
     @subscribe atom.commands.add 'atom-text-editor',
-      'vim-mode-plus-user:toggle-overwrite': ->
+      'vim-mode-plus-user:move-selected-text-toggle-overwrite': ->
         newValue = not atom.config.get(OverwriteConfig)
         atom.config.set(OverwriteConfig, newValue)
 
