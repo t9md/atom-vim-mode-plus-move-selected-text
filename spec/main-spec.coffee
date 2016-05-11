@@ -1,5 +1,4 @@
 {inspect} = require 'util'
-p = (args...) -> console.log inspect(args...)
 
 requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
@@ -10,6 +9,9 @@ rowRange = (startRow, endRow) ->
 
 toggleOverwrite = (target) ->
   dispatch(target, 'vim-mode-plus-user:move-selected-text-toggle-overwrite')
+
+getOverwriteConfig = ->
+  atom.config.get('vim-mode-plus-move-selected-text.overwrite')
 
 {getVimState, TextData, dispatch} = requireFrom 'vim-mode-plus', 'spec/spec-helper'
 
@@ -27,6 +29,10 @@ toggleOverwrite = (target) ->
 
 describe "vim-mode-plus-move-selected-text", ->
   [set, ensure, keystroke, editor, editorElement, vimState] = []
+
+  ensureOverwriteClass = (target, bool) ->
+    className = 'vim-mode-plus-move-selected-text-overwrite'
+    expect(target.classList.contains(className)).toBe(bool)
 
   beforeEach ->
     getVimState (state, vim) ->
@@ -52,44 +58,39 @@ describe "vim-mode-plus-move-selected-text", ->
 
   describe "overwrite config", ->
     [vimState1, vimState2, vimState3] = []
-    overwriteConfig = 'vim-mode-plus-move-selected-text.overwrite'
-    overwriteClass = 'vim-mode-plus-move-selected-text-overwrite'
 
     beforeEach ->
       getVimState "sample1", (state, vim) -> vimState1 = state
       getVimState "sample2", (state, vim) -> vimState2 = state
 
     it "toggle command toggle overwrite config value", ->
-      expect(atom.config.get(overwriteConfig)).toBe(false)
+      expect(getOverwriteConfig()).toBe(false)
 
-      dispatch(editorElement, 'vim-mode-plus-user:move-selected-text-toggle-overwrite')
-      expect(atom.config.get(overwriteConfig)).toBe(true)
+      toggleOverwrite(editorElement)
+      expect(getOverwriteConfig()).toBe(true)
 
-      dispatch(editorElement, 'vim-mode-plus-user:move-selected-text-toggle-overwrite')
-      expect(atom.config.get(overwriteConfig)).toBe(false)
+      toggleOverwrite(editorElement)
+      expect(getOverwriteConfig()).toBe(false)
 
     describe "when overwrite config is toggled in false -> true -> false", ->
       it "add/remove overwrite css class to/from all editorElement including newly created editor", ->
         runs ->
-          expect(atom.config.get(overwriteConfig)).toBe(false)
-          for {editorElement: el} in [vimState1, vimState2]
-            expect(el.classList.contains(overwriteClass)).toBe(false)
+          # ensureOverwrite
+          expect(getOverwriteConfig()).toBe(false)
+          ensureOverwriteClass(el, false) for {editorElement: el} in [vimState1, vimState2]
 
           toggleOverwrite(vimState1.editorElement)
-          expect(atom.config.get(overwriteConfig)).toBe(true)
-          for {editorElement: el} in [vimState1, vimState2]
-            expect(el.classList.contains(overwriteClass)).toBe(true)
+          expect(getOverwriteConfig()).toBe(true)
+          ensureOverwriteClass(el, true) for {editorElement: el} in [vimState1, vimState2]
 
         getVimState "sample3", (state, vim) ->
           vimState3 = state
-          el = state.editorElement
-          expect(el.classList.contains(overwriteClass)).toBe(true)
+          ensureOverwriteClass(state.editorElement, true)
 
         runs ->
           toggleOverwrite(vimState1.editorElement)
-          expect(atom.config.get(overwriteConfig)).toBe(false)
-          for {editorElement: el} in [vimState1, vimState2, vimState3]
-            expect(el.classList.contains(overwriteClass)).toBe(false)
+          expect(getOverwriteConfig()).toBe(false)
+          ensureOverwriteClass(el, false) for {editorElement: el} in [vimState1, vimState2, vimState3]
 
         waitsForPromise ->
           atom.packages.activatePackage('vim-mode-plus-move-selected-text')
@@ -102,13 +103,10 @@ describe "vim-mode-plus-move-selected-text", ->
         toggleOverwrite(vimState1.editorElement)
         els = (state.editorElement for state in [vimState1, vimState2, vimState3])
         els.push(editorElement)
-
-        for el in els
-          expect(el.classList.contains(overwriteClass)).toBe(true)
+        ensureOverwriteClass(el, true) for el in els
 
         atom.packages.deactivatePackage('vim-mode-plus-move-selected-text')
-        for el in els
-          expect(el.classList.contains(overwriteClass)).toBe(false)
+        ensureOverwriteClass(el, false) for el in els
 
   describe "move up/down", ->
     textData = null
