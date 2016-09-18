@@ -353,7 +353,7 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedTextUp
         .map (text) -> text.repeat(count+1)
         .join("\n") + "\n"
 
-    @withLinewise selection, =>
+    @withLinewise selection, ->
       text = getText()
       range = selection.getBufferRange()
       setTextInRangeAndSelect(range, text, selection)

@@ -1,3 +1,6 @@
+## 0.6.1
+- Minor change.
+
 ## 0.6.0
 - Improve: Use new concise keystroke format for spec.
 - Breaking: Rename `toggle-overwrite` to `move-selected-text-toggle-overwrite`.
