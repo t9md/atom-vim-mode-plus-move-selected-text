@@ -1,11 +1,9 @@
 @import "ui-variables";
 
 atom-text-editor.vim-mode-plus.visual-mode.is-focused {
-  &.vim-mode-plus-move-selected-text-overwrite::shadow {
-    .cursor {
-      border: 0;
-      background-color: @background-color-success;
-      opacity: 0.5;
-    }
+  &.vim-mode-plus-move-selected-text-overwrite .cursor {
+    border: 0;
+    background-color: @background-color-success;
+    opacity: 0.5;
   }
 }

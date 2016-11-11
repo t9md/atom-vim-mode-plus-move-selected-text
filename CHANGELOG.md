@@ -1,3 +1,6 @@
+## 0.6.2
+- Fix: Deprecation warning for use of `::shadow`. #2
+
 ## 0.6.1
 - Minor change.
 
