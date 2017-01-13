@@ -44,6 +44,7 @@ class MoveSelectedText extends Operator
     fn(selection)
     disposable?.dispose()
 
+# Up/Down
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
 
@@ -168,11 +169,9 @@ class MoveSelectedTextUp extends MoveSelectedText
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
 
+# Left/Right
 class MoveSelectedTextLeft extends MoveSelectedTextUp
   direction: 'left'
-
-  canMoveSelection: (selection) ->
-    selection.getBufferRange().start.column > 0
 
   moveLinewise: (selection) ->
     switch @direction
@@ -180,7 +179,9 @@ class MoveSelectedTextLeft extends MoveSelectedTextUp
       when 'right' then selection.indentSelectedRows()
 
   moveCharacterwise: (selection) ->
-    return unless @canMoveSelection(selection)
+    if @direction is 'left'
+      return unless selection.getBufferRange().start.column > 0
+
     if @direction is 'right'
       endPoint = selection.getBufferRange().end
       insertTextAtPoint(@editor, endPoint, " ") if pointIsAtEndOfLine(@editor, endPoint)
@@ -190,8 +191,6 @@ class MoveSelectedTextLeft extends MoveSelectedTextUp
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
   direction: 'right'
-  canMoveSelection: (selection) ->
-    true
 
 # Duplicate
 # -------------------------
@@ -232,6 +231,7 @@ class DuplicateSelectedText extends MoveSelectedText
         else
           @duplicateCharacterwise(selection, count)
 
+# Up/Down
 class DuplicateSelectedTextUp extends DuplicateSelectedText
   direction: 'up'
   withBlockwise: (fn) ->
@@ -243,25 +243,22 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
       @vimState.activate('visual', 'characterwise')
 
   execute: ->
-    if @isLinewise() or (not @isLinewise() and (@direction in ['right', 'left']))
-      super
-    else
-      @editor.transact =>
-        return if (count = @getCount()) is 0
-        @withBlockwise =>
-          if @direction is 'down'
-            bottom = _.last(@editor.getSelectionsOrderedByBufferPosition())
-            range = bottom.getBufferRange()
-            if range.end.row is @editor.getLastBufferRow()
-              # Since inserting new line modify selected range
-              # We have to revert selction range to preserved one.
-              ensureBufferEndWithNewLine(@editor)
-              bottom.setBufferRange(range)
+    @editor.transact =>
+      return if (count = @getCount()) is 0
+      @withBlockwise =>
+        if @direction is 'down'
+          bottom = _.last(@editor.getSelectionsOrderedByBufferPosition())
+          range = bottom.getBufferRange()
+          if range.end.row is @editor.getLastBufferRow()
+            # Since inserting new line modify selected range
+            # We have to revert selction range to preserved one.
+            ensureBufferEndWithNewLine(@editor)
+            bottom.setBufferRange(range)
 
-          bss = @vimState.getBlockwiseSelectionsOrderedByBufferPosition()
-          bss.reverse() if @direction is 'down'
-          for bs in bss
-            @duplicateCharacterwise(bs, count)
+        bss = @vimState.getBlockwiseSelectionsOrderedByBufferPosition()
+        bss.reverse() if @direction is 'down'
+        for bs in bss
+          @duplicateCharacterwise(bs, count)
 
   duplicateLinewise: (selection, count) ->
     getText = ->
@@ -316,10 +313,10 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     insertBlankLine(height * count)
 
     ranges = []
-    @countTimes (num) =>
+    @countTimes @getCount(), ({count}) =>
       for selection, i in blockwiseSelection.selections
         text = selection.getText()
-        range = getRangeToInsert(selection, num)
+        range = getRangeToInsert(selection, count)
         insertSpacesToPoint(@editor, range.start)
         ranges.push @editor.setTextInBufferRange(range, text)
     select(ranges)
@@ -327,36 +324,43 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
   direction: 'down'
 
-class DuplicateSelectedTextLeft extends DuplicateSelectedTextUp
+# Left/Right
+class DuplicateSelectedTextLeft extends DuplicateSelectedText
   direction: 'left'
 
+  # No behavior-diff by 'isOverwriteMode'
   duplicateLinewise: (selection, count) ->
     getText = ->
       swrap(selection).lineTextForBufferRows()
         .map (text) -> text.repeat(count+1)
         .join("\n") + "\n"
 
+    getRange = ->
+      selection.getBufferRange()
+
     @withLinewise selection, ->
-      text = getText()
-      range = selection.getBufferRange()
-      setTextInRangeAndSelect(range, text, selection)
+      setTextInRangeAndSelect(getRange(), getText(), selection)
 
   duplicateCharacterwise: (selection, count) ->
-    getRangeToInsert = (text) =>
-      {start, end} = selection.getBufferRange()
-      if @isOverwriteMode()
-        width = text.length
-        switch @direction
-          when 'right' then [end, end.translate([0, +width])]
-          when 'left' then [start.translate([0, -width]), start]
-      else
-        switch @direction
-          when 'right' then [end, end]
-          when 'left' then [start, start]
+    getText = ->
+      selection.getText().repeat(count)
 
-    text = selection.getText().repeat(count)
-    range = getRangeToInsert(text)
-    setTextInRangeAndSelect(range, text, selection)
+    getRange = =>
+      width = getText().length
+      {start, end} = selection.getBufferRange()
+      switch @direction
+        when 'right'
+          range = new Range(end, end)
+          if @isOverwriteMode()
+            range.end = range.end.translate([0, +width])
+          range
+        when 'left'
+          range = new Range(start, start)
+          if @isOverwriteMode()
+            range.start = range.start.translate([0, -width])
+          range
+
+    setTextInRangeAndSelect(getRange(), getText(), selection)
 
 class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
   direction: 'right'
