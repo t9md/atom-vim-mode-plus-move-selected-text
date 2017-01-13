@@ -27,7 +27,7 @@ class MoveSelectedText extends Operator
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
 
-  isOverwrite: ->
+  isOverwriteMode: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
 
   isLinewise: ->
@@ -57,6 +57,8 @@ class MoveSelectedTextUp extends MoveSelectedText
         disposable.dispose()
         disposableByEditor.delete(@editor)
         stateManager.remove(@editor)
+
+    super
 
   getInitialOverwrittenBySelection: ->
     overwrittenBySelection = new Map
@@ -106,7 +108,7 @@ class MoveSelectedTextUp extends MoveSelectedText
     if @direction is 'down' # auto insert new linew at last row
       extendLastBufferRowToRow(@editor, range.end.row)
 
-    if @isOverwrite()
+    if @isOverwriteMode()
       overwrittenArea = stateManager.get(@editor).overwrittenBySelection.get(selection)
     area = new Area(@editor.getTextInBufferRange(range), @isLinewise(), overwrittenArea)
     range = @editor.setTextInBufferRange(range, area.getTextByRotate(@direction))
@@ -114,7 +116,7 @@ class MoveSelectedTextUp extends MoveSelectedText
     selection.setBufferRange(range, {reversed})
 
   # Return 0 when no longer movable
-  getCount: =>
+  getCount: ->
     count = super
     if @direction is 'up'
       topSelection = @editor.getSelectionsOrderedByBufferPosition()[0]
@@ -155,7 +157,7 @@ class MoveSelectedTextUp extends MoveSelectedText
     movingText = @editor.getTextInBufferRange(fromRange)
     replacedText = @editor.getTextInBufferRange(toRange)
 
-    if @isOverwrite()
+    if @isOverwriteMode()
       area = stateManager.get(@editor).overwrittenBySelection.get(selection)
       replacedText = area.pushOut(replacedText, opposite(@direction))
     @editor.setTextInBufferRange(fromRange, replacedText)
@@ -169,35 +171,34 @@ class MoveSelectedTextDown extends MoveSelectedTextUp
 class MoveSelectedTextLeft extends MoveSelectedTextUp
   direction: 'left'
 
+  canMoveSelection: (selection) ->
+    selection.getBufferRange().start.column > 0
+
   moveLinewise: (selection) ->
-    selection.outdentSelectedRows()
+    switch @direction
+      when 'left' then selection.outdentSelectedRows()
+      when 'right' then selection.indentSelectedRows()
 
   moveCharacterwise: (selection) ->
-    return if selection.getBufferRange().start.column is 0
+    return unless @canMoveSelection(selection)
+    if @direction is 'right'
+      endPoint = selection.getBufferRange().end
+      insertTextAtPoint(@editor, endPoint, " ") if pointIsAtEndOfLine(@editor, endPoint)
 
     @rotateTextForSelection(selection)
-    @editor.scrollToCursorPosition({center: true})
+    @editor.scrollToCursorPosition(center: true)
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
   direction: 'right'
-
-  moveLinewise: (selection) ->
-    selection.indentSelectedRows()
-
-  moveCharacterwise: (selection) ->
-    eol = selection.getBufferRange().end
-    if pointIsAtEndOfLine(@editor, eol)
-      insertTextAtPoint(@editor, eol, " ")
-
-    @rotateTextForSelection(selection)
-    @editor.scrollToCursorPosition({center: true})
+  canMoveSelection: (selection) ->
+    true
 
 # Duplicate
 # -------------------------
 class DuplicateSelectedText extends MoveSelectedText
   getCount: ->
     count = super
-    return count unless @isOverwrite()
+    return count unless @isOverwriteMode()
     switch @direction
       when 'up'
         if @isLinewise()
@@ -271,7 +272,7 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
       {start, end} = selection.getBufferRange()
       if @direction is 'down' and end.isEqual(@editor.getEofBufferPosition())
         end = ensureBufferEndWithNewLine(@editor)
-      if @isOverwrite()
+      if @isOverwriteMode()
         height = text.split("\n").length - 1
         switch @direction
           when 'up' then [start.translate([-height, 0]), start]
@@ -289,7 +290,7 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
   duplicateCharacterwise: (blockwiseSelection, count)  ->
     insertBlankLine = (amount) =>
       [startRow, endRow] = blockwiseSelection.getBufferRowRange()
-      if @isOverwrite()
+      if @isOverwriteMode()
         if @direction is 'down'
           extendLastBufferRowToRow(@editor, endRow + amount)
       else
@@ -343,7 +344,7 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedTextUp
   duplicateCharacterwise: (selection, count) ->
     getRangeToInsert = (text) =>
       {start, end} = selection.getBufferRange()
-      if @isOverwrite()
+      if @isOverwriteMode()
         width = text.length
         switch @direction
           when 'right' then [end, end.translate([0, +width])]
