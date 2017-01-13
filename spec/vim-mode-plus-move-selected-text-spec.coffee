@@ -1,3 +1,4 @@
+_ = require 'underscore-plus'
 {inspect} = require 'util'
 
 requireFrom = (pack, path) ->
@@ -36,6 +37,10 @@ describe "vim-mode-plus-move-selected-text", ->
   ensureOverwriteClass = (target, bool) ->
     className = 'vim-mode-plus-move-selected-text-overwrite'
     expect(target.classList.contains(className)).toBe(bool)
+
+  getEnsureWithOptions = (optionsBase) ->
+    (keystroke, options) ->
+      ensure(keystroke, _.defaults(_.clone(options), optionsBase))
 
   beforeEach ->
     getVimState (state, vim) ->
@@ -129,46 +134,37 @@ describe "vim-mode-plus-move-selected-text", ->
         ensureOverwriteClassForVimStates(allVimState, false)
 
   describe "move up/down", ->
-    beforeEach ->
-      set textC: "|line0\nline1\nline2\n"
-
     describe "linewise", ->
       describe "overwrite: false", ->
-        getEnsurerForLinewiseMove = ({selectedText, selectionIsReversed}) ->
-          (keystroke, {text}) ->
-            ensure(keystroke, {text, selectedText, selectionIsReversed})
+        beforeEach ->
+          set textC: "|line0\nline1\nline2\n"
 
         it "[case-1] one line", ->
-          options = {selectedText: "line0\n", selectionIsReversed: false}
-          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove = getEnsureWithOptions(selectedText: "line0\n", selectionIsReversed: false)
           ensureMove 'V', text: "line0\nline1\nline2\n"
           ensureMove 'ctrl-j', text: "line1\nline0\nline2\n" # down
           ensureMove 'ctrl-j', text: "line1\nline2\nline0\n" # down
           ensureMove 'ctrl-k', text: "line1\nline0\nline2\n" # up
           ensureMove 'ctrl-k', text: "line0\nline1\nline2\n" # up
         it "[case-2] two line", ->
-          options = {selectedText: "line0\nline1\n", selectionIsReversed: false}
-          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
           ensureMove 'ctrl-j', text: "line2\nline0\nline1\n"
           ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
         it "[case-3] two line, selection is reversed: keep reversed state", ->
-          options = {selectedText: "line0\nline1\n", selectionIsReversed: true}
-          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: true)
           set cursor: [1, 0]
           ensureMove 'V k', text: "line0\nline1\nline2\n"
           ensureMove 'ctrl-j', text: "line2\nline0\nline1\n"
           ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
         it "extends final row when move down", ->
-          options = {selectedText: "line2\n", selectionIsReversed: false}
-          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove = getEnsureWithOptions(selectedText: "line2\n", selectionIsReversed: false)
           set cursor: [2, 0]
           ensureMove 'V', text: "line0\nline1\nline2\n"
           ensureMove 'ctrl-j', text: "line0\nline1\n\nline2\n"
           ensureMove 'ctrl-j', text: "line0\nline1\n\n\nline2\n"
         it "support count", ->
-          options = {selectedText: "line0\nline1\n", selectionIsReversed: false}
-          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
           ensureMove '2 ctrl-j', text: "line2\n\nline0\nline1\n"
           ensureMove '2 ctrl-k', text: "line0\nline1\nline2\n\n"
@@ -178,116 +174,335 @@ describe "vim-mode-plus-move-selected-text", ->
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
+          set textC: """
+          |line0
+          line1
+          line2\n
+          """
+
+        it "[case-1] one line", ->
+          ensureMove = getEnsureWithOptions(selectedText: "line0\n", selectionIsReversed: false)
+          ensureMove 'V', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "\nline0\nline2\n"
+          ensureMove 'ctrl-j', text: "\nline1\nline0\n"
+          ensureMove 'ctrl-k', text: "\nline0\nline2\n"
+          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+        it "[case-2] two line", ->
+          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
+          ensureMove 'V j', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "\nline0\nline1\n"
+          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+        it "[case-3] two line, selection is reversed: keep reversed state", ->
+          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: true)
+          set cursor: [1, 0]
+          ensureMove 'V k', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "\nline0\nline1\n"
+          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+        it "extends final row when move down", ->
+          ensureMove = getEnsureWithOptions(selectedText: "line2\n", selectionIsReversed: false)
+          set cursor: [2, 0]
+          ensureMove 'V', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "line0\nline1\n\nline2\n"
+          ensureMove 'ctrl-j', text: "line0\nline1\n\n\nline2\n"
+        it "support count", ->
+          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
+          ensureMove 'V j', text: "line0\nline1\nline2\n"
+          ensureMove '2 ctrl-j', text: "\n\nline0\nline1\n"
+          ensureMove '2 ctrl-j', text: "\n\nline2\n\nline0\nline1\n"
+          ensureMove '1 0 ctrl-j', text: "\n\nline2\n\n\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
+          ensureMove '5 ctrl-k', text: "\n\nline2\n\n\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
 
     describe "characterwise", ->
       describe "overwrite: false", ->
         beforeEach ->
           set
+            textC: """
+            o|oo
+            xxx
+            Y|YY
+            ZZZ\n
+            """
+
+        it "move characterwise, support multiple selection", ->
+          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
+          ensureMove 'v l',
             text: """
             ooo
             xxx
             YYY
-            ZZZ
-
+            ZZZ\n
             """
-            cursor: [[0, 1], [2, 1]]
-
-        it "move characterwise, support multiple selection", ->
-          ensure 'v l',
-            mode: ['visual', 'characterwise']
-            selectedTextOrdered: ['oo', 'YY']
-            selectedBufferRange: [
-              [[0, 1], [0, 3]]
-              [[2, 1], [2, 3]]
-            ]
-          ensure 'ctrl-j',
-            selectedTextOrdered: ['oo', 'YY']
-            selectedBufferRange: [
-              [[1, 1], [1, 3]]
-              [[3, 1], [3, 3]]
-            ]
+          ensureMove 'ctrl-j',
             text: """
             oxx
             xoo
             YZZ
-            ZYY
-
+            ZYY\n
             """
-          ensure 'ctrl-j',
-            selectedTextOrdered: ['oo', 'YY']
-            text: """
+          ensureMove 'ctrl-j',
+            text_: """
             oxx
             xZZ
             Yoo
             Z__
-             YY
-            """.replace(/_/g, ' ')
+            _YY
+            """
+          ensureMove '2 ctrl-j',
+            text_: """
+            oxx
+            xZZ
+            Y__
+            Z__
+            _oo
+            ___
+            _YY
+            """
+          ensureMove '4 ctrl-k',
+            text_: """
+            ooo
+            xxx
+            YYY
+            ZZZ
+            ___
+            ___
+            ___
+            """
+
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
+          set
+            textC: """
+            o|oo
+            xxx
+            Y|YY
+            ZZZ\n
+            """
+
+        it "move characterwise, support multiple selection", ->
+          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
+          ensureMove 'v l',
+            text_: """
+            ooo
+            xxx
+            YYY
+            ZZZ\n
+            """
+          ensureMove 'ctrl-j',
+            text_: """
+            o__
+            xoo
+            Y__
+            ZYY\n
+            """
+          ensureMove 'ctrl-j',
+            text_: """
+            o__
+            xxx
+            Yoo
+            ZZZ
+            _YY
+            """
+          ensureMove '2 ctrl-j',
+            text_: """
+            o__
+            xxx
+            Y__
+            ZZZ
+            _oo
+            ___
+            _YY
+            """
+          ensureMove '4 ctrl-k',
+            text_: """
+            ooo
+            xxx
+            YYY
+            ZZZ
+            ___
+            ___
+            ___
+            """
 
   describe "move left/right", ->
     textData = null
     describe "linewise", ->
       beforeEach ->
-        textData = new TextData """
-          line0
-          line1
-          line2
-
-          """
         set
-          text: textData.getRaw()
+          text_: """
+          line0
+          __line1
+          ____line2
+          line3\n
+          """
           cursor: [0, 0]
 
       describe "overwrite: false", ->
-        it "indent/outdent", ->
-          selectedText = "line0\nline1\n"
-          ensure "V j", {selectedText, selectionIsReversed: false}
-          ensure 'ctrl-l',
-            selectedText: "  line0\n  line1\n"
-            selectionIsReversed: false
+        it "indent/outdent, count support", ->
+          ensureMove = getEnsureWithOptions(selectionIsReversed: false)
+          ensureMove "V j",
+            text_: "line0\n__line1\n____line2\nline3\n"
+            selectedText_: "line0\n__line1\n"
+          ensureMove 'ctrl-l',
+            text_: "__line0\n____line1\n____line2\nline3\n"
+            selectedText_: "__line0\n____line1\n"
+          ensureMove '2 ctrl-l',
+            text_: "______line0\n________line1\n____line2\nline3\n"
+            selectedText_: "______line0\n________line1\n"
+          ensureMove 'ctrl-h',
+            text_: "____line0\n______line1\n____line2\nline3\n"
+            selectedText_: "____line0\n______line1\n"
+          ensureMove '1 0 0 ctrl-h',
+            text_: "line0\nline1\n____line2\nline3\n"
+            selectedText_: "line0\nline1\n"
 
-          ensure '2 ctrl-l',
-            selectedText: "      line0\n      line1\n"
-            selectionIsReversed: false
-
-          ensure '2 ctrl-h',
-            selectedText: "  line0\n  line1\n"
-            selectionIsReversed: false
-
-          ensure 'ctrl-h',
-            selectedText: "line0\nline1\n"
-            selectionIsReversed: false
-
-        it "[case-2] indent/outdent", ->
-          text = """
-            line0
-              line1
-                line2
-            line3
-
-            """
-          set {text}
-          ensure "V 3 j", selectedText: text
-          newText = """
-            line0
-            line1
-            line2
-            line3
-
-            """
-          ensure '1 0 ctrl-h', text: newText, selectedText: newText
       describe "overwrite: true", ->
+        # No behavior-diff by overrite setting.
+        # So test below is identical with "override: false"
         beforeEach ->
           setOverwriteConfig(true)
 
-    # TODO
+        it "indent/outdent, count support", ->
+          ensureMove = getEnsureWithOptions(selectionIsReversed: false)
+          ensureMove "V j",
+            text_: "line0\n__line1\n____line2\nline3\n"
+            selectedText_: "line0\n__line1\n"
+          ensureMove 'ctrl-l',
+            text_: "__line0\n____line1\n____line2\nline3\n"
+            selectedText_: "__line0\n____line1\n"
+          ensureMove '2 ctrl-l',
+            text_: "______line0\n________line1\n____line2\nline3\n"
+            selectedText_: "______line0\n________line1\n"
+          ensureMove 'ctrl-h',
+            text_: "____line0\n______line1\n____line2\nline3\n"
+            selectedText_: "____line0\n______line1\n"
+          ensureMove '1 0 0 ctrl-h',
+            text_: "line0\nline1\n____line2\nline3\n"
+            selectedText_: "line0\nline1\n"
+
     describe "characterwise", ->
       describe "overwrite: false", ->
+        beforeEach ->
+          set
+            textC: """
+            oxYZ@
+            o|xYZ@
+            o|xYZ@
+            oxYZ@
+            """
+        it "move right/left count support", ->
+          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
+          ensureMove 'v l',
+            text: """
+            oxYZ@
+            oxYZ@
+            oxYZ@
+            oxYZ@
+            """
+          ensureMove 'ctrl-l',
+            text: """
+            oxYZ@
+            oZxY@
+            oZxY@
+            oxYZ@
+            """
+          ensureMove 'ctrl-l',
+            text: """
+            oxYZ@
+            oZ@xY
+            oZ@xY
+            oxYZ@
+            """
+          ensureMove 'ctrl-l',
+            text_: """
+            oxYZ@
+            oZ@_xY
+            oZ@_xY
+            oxYZ@
+            """
+          ensureMove '5 ctrl-l',
+            text_: """
+            oxYZ@
+            oZ@______xY
+            oZ@______xY
+            oxYZ@
+            """
+          ensureMove '3 ctrl-h',
+            text_: """
+            oxYZ@
+            oZ@___xY___
+            oZ@___xY___
+            oxYZ@
+            """
+          ensureMove '1 0 0 ctrl-h',
+            text_: """
+            oxYZ@
+            xYoZ@______
+            xYoZ@______
+            oxYZ@
+            """
+
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
+          set
+            textC: """
+            oxYZ@
+            o|xYZ@
+            o|xYZ@
+            oxYZ@
+            """
+        it "move right/left count support", ->
+          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
+          ensureMove 'v l',
+            text: """
+            oxYZ@
+            oxYZ@
+            oxYZ@
+            oxYZ@
+            """
+          ensureMove 'ctrl-l',
+            text_: """
+            oxYZ@
+            o_xY@
+            o_xY@
+            oxYZ@
+            """
+          ensureMove 'ctrl-l',
+            text_: """
+            oxYZ@
+            o__xY
+            o__xY
+            oxYZ@
+            """
+          ensureMove 'ctrl-l',
+            text_: """
+            oxYZ@
+            o__ZxY
+            o__ZxY
+            oxYZ@
+            """
+          ensureMove '5 ctrl-l',
+            text_: """
+            oxYZ@
+            o__Z@____xY
+            o__Z@____xY
+            oxYZ@
+            """
+          ensureMove '3 ctrl-h',
+            text_: """
+            oxYZ@
+            o__Z@_xY___
+            o__Z@_xY___
+            oxYZ@
+            """
+          ensureMove '1 0 0 ctrl-h',
+            text_: """
+            oxYZ@
+            xY_Z@______
+            xY_Z@______
+            oxYZ@
+            """
 
   describe "duplicate up/down", ->
     beforeEach ->
