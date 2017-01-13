@@ -13,19 +13,16 @@ Area = require './area'
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 BlockwiseSelection = requireFrom('vim-mode-plus', 'blockwise-selection')
 Base = requireFrom('vim-mode-plus', 'base')
-TransformString = Base.getClass('Operator')
+Operator = Base.getClass('Operator')
+StateManager = require './state-manager'
 
-class State
-  selectedTexts: null
-  checkpoint: null
-  overwrittenBySelection: null
-
-stateByEditor = new Map
+# stateByEditor = new Map
+stateManager = new StateManager()
 disposableByEditor = new Map
 
 # Move
 # -------------------------
-class MoveSelectedText extends TransformString
+class MoveSelectedText extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
@@ -50,28 +47,16 @@ class MoveSelectedText extends TransformString
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
 
-  initState: ->
-    stateByEditor.set(@editor, new State())
-
-  getState: ->
-    stateByEditor.get(@editor)
-
-  hasState: ->
-    stateByEditor.has(@editor)
-
-  removeState: ->
-    stateByEditor.delete(@editor)
-
   initialize: ->
-    @initState() unless @hasState()
+    stateManager.set(@editor) unless stateManager.has(@editor)
     unless disposableByEditor.has(@editor)
       disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) =>
-        @removeState() if mode is 'visual'
+        stateManager.remove(@editor) if mode is 'visual'
 
       disposableByEditor.set @editor, @editor.onDidDestroy =>
         disposable.dispose()
         disposableByEditor.delete(@editor)
-        @removeState()
+        stateManager.remove(@editor)
 
   getInitialOverwrittenBySelection: ->
     overwrittenBySelection = new Map
@@ -91,17 +76,14 @@ class MoveSelectedTextUp extends MoveSelectedText
     overwrittenBySelection
 
   withUndoJoin: (fn) ->
-    state = @getState()
-    isSequential = state.selectedTexts is getSelectedTexts(@editor)
-    unless isSequential
-      state.checkpoint = @editor.createCheckpoint()
-      state.overwrittenBySelection = null
+    state = stateManager.get(@editor)
+    state.init() unless state.isSequential()
     unless state.overwrittenBySelection?
       state.overwrittenBySelection = @getInitialOverwrittenBySelection()
+
     fn()
-    state.selectedTexts = getSelectedTexts(@editor)
-    if isSequential
-      @editor.groupChangesSinceCheckpoint(state.checkpoint)
+    state.updateSelectedTexts()
+    state.groupChanges()
 
   # Used by
   # - up: linewise
@@ -125,7 +107,7 @@ class MoveSelectedTextUp extends MoveSelectedText
       extendLastBufferRowToRow(@editor, range.end.row)
 
     if @isOverwrite()
-      overwrittenArea = @getState().overwrittenBySelection.get(selection)
+      overwrittenArea = stateManager.get(@editor).overwrittenBySelection.get(selection)
     area = new Area(@editor.getTextInBufferRange(range), @isLinewise(), overwrittenArea)
     range = @editor.setTextInBufferRange(range, area.getTextByRotate(@direction))
     range = range.translate(translation.reverse()...)
@@ -174,7 +156,7 @@ class MoveSelectedTextUp extends MoveSelectedText
     replacedText = @editor.getTextInBufferRange(toRange)
 
     if @isOverwrite()
-      area = @getState().overwrittenBySelection.get(selection)
+      area = stateManager.get(@editor).overwrittenBySelection.get(selection)
       replacedText = area.pushOut(replacedText, opposite(@direction))
     @editor.setTextInBufferRange(fromRange, replacedText)
     @editor.setTextInBufferRange(toRange, movingText)
