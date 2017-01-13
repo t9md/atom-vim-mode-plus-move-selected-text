@@ -584,23 +584,199 @@ describe "vim-mode-plus-move-selected-text", ->
             4\n
             """
 
-    # TODO
     describe "characterwise", ->
       describe "overwrite: false", ->
+        beforeEach ->
+          set
+            textC: """
+            o|ooo
+            xxxx
+            Y|YYY
+            ZZZZ\n
+            """
+        it "duplicate charwise down", ->
+          ensure 'v l',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['oo', 'YY']
+            text: """
+            oooo
+            xxxx
+            YYYY
+            ZZZZ\n
+            """
+          ensure 'cmd-K',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['oo', 'YY']
+            text_: """
+            _oo
+            oooo
+            xxxx
+            _YY
+            YYYY
+            ZZZZ\n
+            """
+            selectedBufferRange: [
+              [[0, 1], [0, 3]]
+              [[3, 1], [3, 3]]
+            ]
+          ensure '2 cmd-K',
+            mode: ['visual', 'blockwise']
+            selectedTextOrdered: ['oo', 'oo', 'YY', 'YY']
+            text_: """
+            _oo
+            _oo
+            _oo
+            oooo
+            xxxx
+            _YY
+            _YY
+            _YY
+            YYYY
+            ZZZZ\n
+            """
+            selectedBufferRangeOrdered: [
+              [[0, 1], [0, 3]]
+              [[1, 1], [1, 3]]
+              [[5, 1], [5, 3]]
+              [[6, 1], [6, 3]]
+            ]
+
+        it "duplicate charwise down", ->
+          ensure 'v l',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['oo', 'YY']
+            text_: """
+            oooo
+            xxxx
+            YYYY
+            ZZZZ\n
+            """
+          ensure 'cmd-J',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['oo', 'YY']
+            text_: """
+            oooo
+            _oo
+            xxxx
+            YYYY
+            _YY
+            ZZZZ\n
+            """
+            selectedBufferRangeOrdered: [
+              [[1, 1], [1, 3]]
+              [[4, 1], [4, 3]]
+            ]
+          ensure '2 cmd-J',
+            mode: ['visual', 'blockwise']
+            selectedTextOrdered: ['oo', 'oo', 'YY', 'YY']
+            text_: """
+            oooo
+            _oo
+            _oo
+            _oo
+            xxxx
+            YYYY
+            _YY
+            _YY
+            _YY
+            ZZZZ\n
+            """
+            selectedBufferRangeOrdered: [
+              [[2, 1], [2, 3]]
+              [[3, 1], [3, 3]]
+              [[7, 1], [7, 3]]
+              [[8, 1], [8, 3]]
+            ]
+
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
+          set
+            textC: """
+            o|ooo
+            xxxx
+            Y|YYY
+            ZZZZ\n
+            """
+
+        it "duplicate charwise down", ->
+          ensure 'v l',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['oo', 'YY']
+            text: """
+            oooo
+            xxxx
+            YYYY
+            ZZZZ\n
+            """
+          ensure 'cmd-J',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['oo', 'YY']
+            text: """
+            oooo
+            xoox
+            YYYY
+            ZYYZ\n
+            """
+          ensure '2 cmd-J',
+            mode: ['visual', 'blockwise']
+            selectedTextOrdered: ['oo', 'oo', 'YY', 'YY']
+            text: """
+            oooo
+            xoox
+            YooY
+            ZooZ
+             YY
+             YY
+            """
+        it "duplicate charwise up", ->
+          set
+            cursor: [
+              [2, 1]
+              [3, 1]
+            ]
+          ensure 'v l',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['YY', 'ZZ']
+            text: """
+            oooo
+            xxxx
+            YYYY
+            ZZZZ\n
+            """
+          ensure 'cmd-K',
+            mode: ['visual', 'characterwise']
+            selectedTextOrdered: ['YY', 'ZZ']
+            text: """
+            oooo
+            xYYx
+            YZZY
+            ZZZZ\n
+            """
+            selectedBufferRangeOrdered: [
+              [[1, 1], [1, 3]]
+              [[2, 1], [2, 3]]
+            ]
+          # ensure 'cmd-K',
+          #   mode: ['visual', 'characterwise']
+          #   selectedTextOrdered: ['YY', 'ZZ']
+          #   text: """
+          #   oYYo
+          #   xZZx
+          #   YZZY
+          #   ZZZZ\n
+          #   """
 
   describe "duplicate right/left", ->
-    originalText = null
     describe "linewise", ->
+      originalText = null
       beforeEach ->
         originalText = """
-        0 |_
-        1 midle |_
-        2 very long |_
+          0 |_
+          1 midle |_
+          2 very long |_
 
-        """
+          """
         set
           text: originalText
           cursor: [0, 0]
@@ -625,7 +801,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
             """
 
-        it "???duplicate linewise left(identical behavior to right)", ->
+        it "duplicate linewise left(identical behavior to right)", ->
           ensure 'V j j cmd-H',
             selectedBufferRange: rowRange(0, 2)
             text: """
@@ -634,11 +810,20 @@ describe "vim-mode-plus-move-selected-text", ->
             2 very long |_2 very long |_
 
             """
+        it "duplicate linewise left with count(identical behavior to right)", ->
+          ensure 'V j j 2 cmd-H',
+            selectedBufferRange: rowRange(0, 2)
+            text: """
+            0 |_0 |_0 |_
+            1 midle |_1 midle |_1 midle |_
+            2 very long |_2 very long |_2 very long |_
+
+            """
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
 
-        it "duplicate linewise right(no behavior diff)", ->
+        it "duplicate linewise right(no behavior diff with overwrite=false)", ->
           ensure 'V j j cmd-L',
             selectedBufferRange: rowRange(0, 2)
             text: """
@@ -647,14 +832,155 @@ describe "vim-mode-plus-move-selected-text", ->
             2 very long |_2 very long |_
 
             """
+        it "duplicate linewise right(no behavior diff with overwrite=false)", ->
+          ensure 'V j j 2 cmd-L',
+            selectedBufferRange: rowRange(0, 2)
+            text: """
+            0 |_0 |_0 |_
+            1 midle |_1 midle |_1 midle |_
+            2 very long |_2 very long |_2 very long |_
+
+            """
         it "duplicate linewise left do nothing", ->
           ensure 'V j j cmd-H',
             selectedBufferRange: rowRange(0, 2)
             text: originalText
+        it "duplicate linewise left with count do nothing", ->
+          ensure 'V j j 2 cmd-H',
+            selectedBufferRange: rowRange(0, 2)
+            text: originalText
 
-    # TODO
     describe "characterwise", ->
       describe "overwrite: false", ->
+        beforeEach ->
+          set
+            textC: """
+            o|oo
+            xxx
+            Y|YY
+            ZZZ\n
+            """
+        it "duplicate charwise", ->
+          ensureDuplicate = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
+          ensureDuplicate 'v l',
+            text: """
+            ooo
+            xxx
+            YYY
+            ZZZ\n
+            """
+          ensureDuplicate 'cmd-L',
+            text: """
+            ooooo
+            xxx
+            YYYYY
+            ZZZ\n
+            """
+          ensureDuplicate '2 cmd-L',
+            selectedTextOrdered: ['oooo', 'YYYY']
+            text: """
+            ooooooooo
+            xxx
+            YYYYYYYYY
+            ZZZ\n
+            """
+          ensureDuplicate 'ctrl-j', # "move"
+            selectedTextOrdered: ['oooo', 'YYYY']
+            text_: """
+            ooooo____
+            xxx  oooo
+            YYYYY____
+            ZZZ__YYYY\n
+            """
+          ensureDuplicate 'cmd-H',
+            selectedTextOrdered: ['oooo', 'YYYY']
+            selectedBufferRange: [
+              [[1, 5], [1, 9]]
+              [[3, 5], [3, 9]]
+            ]
+            text_: """
+            ooooo____
+            xxx__oooooooo
+            YYYYY____
+            ZZZ__YYYYYYYY\n
+            """
+          ensureDuplicate '2 cmd-H',
+            selectedTextOrdered: ['oooooooo', 'YYYYYYYY']
+            selectedBufferRange: [
+              [[1, 5], [1, 13]]
+              [[3, 5], [3, 13]]
+            ]
+            text_: """
+            ooooo____
+            xxx__oooooooooooooooo
+            YYYYY____
+            ZZZ__YYYYYYYYYYYYYYYY\n
+            """
+
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
+          set
+            textC: """
+            o|xYZ@
+            oxYZ@
+            o|xYZ@
+            oxYZ@\n
+            """
+
+        it "duplicate charwise", ->
+          ensureDuplicate = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
+          ensureDuplicate 'v l',
+            text: """
+            oxYZ@
+            oxYZ@
+            oxYZ@
+            oxYZ@\n
+            """
+          ensureDuplicate 'cmd-L',
+            text: """
+            oxYxY
+            oxYZ@
+            oxYxY
+            oxYZ@\n
+            """
+            selectedBufferRange: [
+              [[0, 3], [0, 5]]
+              [[2, 3], [2, 5]]
+            ]
+          ensureDuplicate '2 cmd-L',
+            selectedTextOrdered: ['xYxY', 'xYxY']
+            text: """
+            oxYxYxYxY
+            oxYZ@
+            oxYxYxYxY
+            oxYZ@\n
+            """
+            selectedBufferRange: [
+              [[0, 5], [0, 9]]
+              [[2, 5], [2, 9]]
+            ]
+          ensureDuplicate 'ctrl-j', # "move"
+            selectedTextOrdered: ['xYxY', 'xYxY']
+            text_: """
+            oxYxY____
+            oxYZ@xYxY
+            oxYxY____
+            oxYZ@xYxY\n
+            """
+            selectedBufferRange: [
+              [[1, 5], [1, 9]]
+              [[3, 5], [3, 9]]
+            ]
+          ensureDuplicate 'cmd-H',
+            selectedTextOrdered: ['xYxY', 'xYxY']
+            text_: """
+            oxYxY____
+            oxYxYxYxY
+            oxYxY____
+            oxYxYxYxY\n
+            """
+            selectedBufferRange: [
+              [[1, 1], [1, 5]]
+              [[3, 1], [3, 5]]
+            ]
