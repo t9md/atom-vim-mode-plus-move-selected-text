@@ -507,126 +507,73 @@ describe "vim-mode-plus-move-selected-text", ->
   describe "duplicate up/down", ->
     beforeEach ->
       set
-        text: """
-        line0
+        textC: """
+        |line0
         line1
         line2
 
         """
-        cursor: [0, 0]
 
     describe "linewise", ->
       describe "overwrite: false", ->
         it "duplicate single line", ->
-          ensure 'V', selectedText: 'line0\n'
+          ensure 'V',
+            selectedBufferRange: rowRange(0, 0)
           ensure 'cmd-J',
             selectedBufferRange: rowRange(1, 1)
             text: 'line0\nline0\nline1\nline2\n'
+
         it "duplicate 2 selected line", ->
-          ensure 'V j', selectedText: 'line0\nline1\n'
+          ensure 'V j',
+            selectedBufferRange: rowRange(0, 1)
           ensure 'cmd-J',
             selectedBufferRange: rowRange(2, 3)
-            text: """
-            line0
-            line1
-            line0
-            line1
-            line2
-
-            """
+            text: "line0\nline1\nline0\nline1\nline2\n"
           ensure 'cmd-K',
             selectedBufferRange: rowRange(2, 3)
-            text: """
-            line0
-            line1
-            line0
-            line1
-            line0
-            line1
-            line2
-
-            """
+            text: "line0\nline1\nline0\nline1\nline0\nline1\nline2\n"
         it "suport count", ->
-          ensure 'V', selectedText: 'line0\n'
+          ensure 'V',
+            selectedBufferRange: rowRange(0, 0)
           ensure '2 cmd-J',
             selectedBufferRange: rowRange(1, 2)
-            text: """
-            line0
-            line0
-            line0
-            line1
-            line2
-
-            """
+            text: "line0\nline0\nline0\nline1\nline2\n"
           ensure '2 cmd-K',
             selectedBufferRange: rowRange(1, 4)
-            text: """
-            line0
-            line0
-            line0
-            line0
-            line0
-            line0
-            line0
-            line1
-            line2
-
-            """
+            text: "line0\nline0\nline0\nline0\nline0\nline0\nline0\nline1\nline2\n"
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
 
         it "overrite lines down", ->
-          ensure 'V', selectedBufferRange: rowRange(0, 0)
+          ensure 'V',
+            selectedBufferRange: rowRange(0, 0)
           ensure 'cmd-J',
-            text: """
-            line0
-            line0
-            line2
-
-            """
+            text: "line0\nline0\nline2\n"
           ensure 'cmd-J',
-            text: """
-            line0
-            line0
-            line0
-
-            """
+            text: "line0\nline0\nline0\n"
             selectedBufferRange: rowRange(2, 2)
           ensure '2 cmd-J',
-            text: """
-            line0
-            line0
-            line0
-            line0
-            line0
-
-            """
+            text: "line0\nline0\nline0\nline0\nline0\n"
             selectedBufferRange: rowRange(3, 4)
 
         it "overrite lines up", ->
-          ensure 'j j V', selectedBufferRange: rowRange(2, 2)
+          ensure 'j j V',
+            selectedBufferRange: rowRange(2, 2)
           ensure '2 cmd-K',
             selectedBufferRange: rowRange(0, 1)
-            text: """
-            line2
-            line2
-            line2
-
-            """
+            text: "line2\nline2\nline2\n"
         it "adjust count when duplicate up to stop overwrite when no enough height is available", ->
           set
-            text: """
+            textC: """
             0
             1
             2
-            3
-            4
-
+            |3
+            4\n
             """
-            cursor: [3, 0]
-
-          ensure 'V j', selectedBufferRange: rowRange(3, 4)
+          ensure 'V j',
+            selectedBufferRange: rowRange(3, 4)
           ensure '1 0 cmd-K',
             selectedBufferRange: rowRange(1, 2)
             text: """
@@ -634,8 +581,7 @@ describe "vim-mode-plus-move-selected-text", ->
             3
             4
             3
-            4
-
+            4\n
             """
 
     # TODO
