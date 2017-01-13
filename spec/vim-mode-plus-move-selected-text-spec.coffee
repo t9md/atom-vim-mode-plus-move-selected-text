@@ -134,8 +134,7 @@ describe "vim-mode-plus-move-selected-text", ->
       textData = new TextData """
         line0
         line1
-        line2
-
+        line2\n
         """
       set
         text: textData.getRaw()
@@ -143,60 +142,47 @@ describe "vim-mode-plus-move-selected-text", ->
 
     describe "linewise", ->
       describe "overwrite: false", ->
-        lines = (lines...) -> text.getLines(lines)
-        getEnsurerForLinewiseMove = (textData, {selectedText, selectionIsReversed}) ->
-          (keystroke, {rows, text}) ->
-            if (not text?) and rows?
-              text = textData.getLines(rows)
-            ensure keystroke, {text, selectedText, selectionIsReversed}
+        getEnsurerForLinewiseMove = ({selectedText, selectionIsReversed}) ->
+          (keystroke, {text}) ->
+            ensure(keystroke, {text, selectedText, selectionIsReversed})
 
         it "[case-1] one line", ->
-          ensureLinewiseMove = getEnsurerForLinewiseMove textData,
-            selectedText: "line0\n", selectionIsReversed: false
-          ensureLinewiseMove 'V', rows: [0, 1, 2]
-          ensureLinewiseMove 'ctrl-j', rows: [1, 0, 2]
-          ensureLinewiseMove 'ctrl-j', rows: [1, 2, 0]
-          ensureLinewiseMove 'ctrl-k', rows: [1, 0, 2]
-          ensureLinewiseMove 'ctrl-k', rows: [0, 1, 2]
+          options = {selectedText: "line0\n", selectionIsReversed: false}
+          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove 'V', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "line1\nline0\nline2\n" # down
+          ensureMove 'ctrl-j', text: "line1\nline2\nline0\n" # down
+          ensureMove 'ctrl-k', text: "line1\nline0\nline2\n" # up
+          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n" # up
         it "[case-2] two line", ->
-          ensureLinewiseMove = getEnsurerForLinewiseMove textData,
-            selectedText: "line0\nline1\n", selectionIsReversed: false
-          ensureLinewiseMove 'V j', rows: [0, 1, 2]
-          ensureLinewiseMove 'ctrl-j', rows: [2, 0, 1]
-          ensureLinewiseMove 'ctrl-k', rows: [0, 1, 2]
+          options = {selectedText: "line0\nline1\n", selectionIsReversed: false}
+          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove 'V j', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "line2\nline0\nline1\n"
+          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
         it "[case-3] two line, selection is reversed: keep reversed state", ->
-          ensureLinewiseMove = getEnsurerForLinewiseMove textData,
-            selectedText: "line0\nline1\n", selectionIsReversed: true
+          options = {selectedText: "line0\nline1\n", selectionIsReversed: true}
+          ensureMove = getEnsurerForLinewiseMove(options)
           set cursor: [1, 0]
-          ensureLinewiseMove 'V k', rows: [0, 1, 2]
-          ensureLinewiseMove 'ctrl-j', rows: [2, 0, 1]
-          ensureLinewiseMove 'ctrl-k', rows: [0, 1, 2]
+          ensureMove 'V k', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "line2\nline0\nline1\n"
+          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
         it "extends final row when move down", ->
-          ensureLinewiseMove = getEnsurerForLinewiseMove textData,
-            selectedText: "line2\n", selectionIsReversed: false
+          options = {selectedText: "line2\n", selectionIsReversed: false}
+          ensureMove = getEnsurerForLinewiseMove(options)
           set cursor: [2, 0]
-          ensureLinewiseMove 'V', rows: [0, 1, 2]
-          ensureLinewiseMove 'ctrl-j', text: [
-            "line0"
-            "line1"
-            ""
-            "line2"
-            ""
-          ].join("\n")
-          ensureLinewiseMove 'ctrl-j', text: [
-            "line0"
-            "line1"
-            ""
-            ""
-            "line2"
-            ""
-          ].join("\n")
+          ensureMove 'V', text: "line0\nline1\nline2\n"
+          ensureMove 'ctrl-j', text: "line0\nline1\n\nline2\n"
+          ensureMove 'ctrl-j', text: "line0\nline1\n\n\nline2\n"
         it "support count", ->
-          ensureLinewiseMove = getEnsurerForLinewiseMove textData,
-            selectedText: "line0\n", selectionIsReversed: false
-          ensureLinewiseMove 'V', rows: [0, 1, 2]
-          ensureLinewiseMove '2 ctrl-j', rows: [1, 2, 0]
-          ensureLinewiseMove '2 ctrl-k', rows: [0, 1, 2]
+          options = {selectedText: "line0\nline1\n", selectionIsReversed: false}
+          ensureMove = getEnsurerForLinewiseMove(options)
+          ensureMove 'V j', text: "line0\nline1\nline2\n"
+          ensureMove '2 ctrl-j', text: "line2\n\nline0\nline1\n"
+          ensureMove '2 ctrl-k', text: "line0\nline1\nline2\n\n"
+          ensureMove '1 0 ctrl-j', text: "line2\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
+          ensureMove '5 ctrl-k', text: "line2\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
+
       describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
