@@ -41,10 +41,12 @@ pop = (list, num) ->
 
 # Return function to restore
 switchToLinewise = (selection) ->
-  swrap(selection).preserveCharacterwise()
-  swrap(selection).expandOverLine(preserveGoalColumn: true)
+  selection = swrap(selection)
+  selection.saveProperties()
+  selection.applyWise('linewise')
   new Disposable ->
-    swrap(selection).restoreCharacterwise()
+    selection.normalize()
+    selection.applyWise('characterwise')
 
 opposite = (direction) ->
   switch direction

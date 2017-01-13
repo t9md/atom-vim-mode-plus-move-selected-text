@@ -10,36 +10,30 @@ module.exports =
       type: 'boolean'
       default: false
 
-  eachEditorElement: (fn) ->
-    atom.workspace.getTextEditors().forEach (editor) ->
-      fn(atom.views.getView(editor))
-
   activate: ->
     @subscriptions = new CompositeDisposable
 
-    @subscribe atom.workspace.observeTextEditors (editor) ->
-      editorElement = atom.views.getView(editor)
-      editorElement.classList.toggle(OverwriteClass, atom.config.get(OverwriteConfig))
+    @subscriptions.add atom.workspace.observeTextEditors (editor) ->
+      editor.element.classList.toggle(OverwriteClass, atom.config.get(OverwriteConfig))
 
-    @subscribe atom.config.observe OverwriteConfig, (newValue) =>
-      @eachEditorElement (editorElement) ->
-        editorElement.classList.toggle(OverwriteClass, newValue)
+    @subscriptions.add atom.config.observe OverwriteConfig, (newValue) ->
+      for editor in atom.workspace.getTextEditors()
+        editor.element.classList.toggle(OverwriteClass, newValue)
 
-    @subscribe atom.commands.add 'atom-text-editor',
+    @subscriptions.add atom.commands.add 'atom-text-editor',
       'vim-mode-plus-user:move-selected-text-toggle-overwrite': ->
-        newValue = not atom.config.get(OverwriteConfig)
-        atom.config.set(OverwriteConfig, newValue)
+        atom.config.set(OverwriteConfig, not atom.config.get(OverwriteConfig))
 
   deactivate: ->
     @subscriptions?.dispose()
     @subscriptions = {}
 
-    @eachEditorElement (editorElement) ->
-      editorElement.classList.remove(OverwriteClass)
+    for editor in atom.workspace.getTextEditors()
+      editor.element.classList.remove(OverwriteClass)
 
   subscribe: (args...) ->
     @subscriptions.add args...
 
   consumeVim: ->
     for name, klass of require("./move-selected-text")
-      @subscribe klass.registerCommand()
+      @subscriptions.add(klass.registerCommand())

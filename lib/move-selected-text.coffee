@@ -9,7 +9,7 @@ _ = require 'underscore-plus'
 {inspect} = require 'util'
 Area = require './area'
 
-{pointIsAtEndOfLine, sortRanges} = requireFrom('vim-mode-plus', 'utils')
+{pointIsAtEndOfLine} = requireFrom('vim-mode-plus', 'utils')
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 BlockwiseSelection = requireFrom('vim-mode-plus', 'blockwise-selection')
 Base = requireFrom('vim-mode-plus', 'base')
@@ -146,7 +146,7 @@ class MoveSelectedTextUp extends MoveSelectedText
       selections = @editor.getSelectionsOrderedByBufferPosition()
       selections.reverse() if @direction is 'down'
       @editor.transact =>
-        @countTimes =>
+        @countTimes @getCount(), =>
           for selection in selections
             if @isLinewise()
               @moveLinewise(selection)
