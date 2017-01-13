@@ -20,6 +20,29 @@ StateManager = require './state-manager'
 stateManager = new StateManager()
 disposableByEditor = new Map
 
+# UndoJoin
+#
+# Move
+# - overwrite: true
+#   - linewise: rotateRows
+#   - characterwise:
+#     if multiRowSelection, behave as linewise
+#   - blockwise
+# - overwrite: false
+#   - linewise
+#   - characterwise
+#   - blockwise
+#
+# Duplicate
+# - overwrite: true
+#   - linewise
+#   - characterwise
+#   - blockwise
+# - overwrite: false
+#   - linewise
+#   - characterwise
+#   - blockwise
+#
 # Move
 # -------------------------
 class MoveSelectedText extends Operator

@@ -1,6 +1,7 @@
 {opposite} = require './utils'
 {inspect} = require 'util'
 
+module.exports =
 class Area
   data: null
   linewise: false
@@ -43,7 +44,7 @@ class Area
         text = @overwrittenArea.pushOut(text, opposite(direction)) if @overwrittenArea?
         @data[0] = [text, other...].join("")
       when 'left'
-        [text, other...,] = @data[0]
+        [text, other...] = @data[0]
         text = @overwrittenArea.pushOut(text, opposite(direction)) if @overwrittenArea?
         @data[0] = [other..., text].join("")
 
@@ -69,5 +70,3 @@ class Area
         pushedOut = data.pop()
         @data[0] = data.join("")
         pushedOut
-
-module.exports = Area

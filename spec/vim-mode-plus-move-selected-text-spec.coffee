@@ -757,15 +757,16 @@ describe "vim-mode-plus-move-selected-text", ->
               [[1, 1], [1, 3]]
               [[2, 1], [2, 3]]
             ]
-          # ensure 'cmd-K',
-          #   mode: ['visual', 'characterwise']
-          #   selectedTextOrdered: ['YY', 'ZZ']
-          #   text: """
-          #   oYYo
-          #   xZZx
-          #   YZZY
-          #   ZZZZ\n
-          #   """
+        xit "duplicate charwise up", ->
+          set
+            textC: """
+            o|ooo
+            xxxx
+            YYYY
+            ZZZZ\n
+            """
+          ensure 'v l cmd-K',
+            mode: ['visual', 'characterwise']
 
   describe "duplicate right/left", ->
     describe "linewise", ->
