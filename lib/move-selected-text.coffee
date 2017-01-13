@@ -243,6 +243,9 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
       @vimState.activate('visual', 'characterwise')
 
   execute: ->
+    if @isLinewise() or @direction in ['right', 'left']
+      return super
+
     @editor.transact =>
       return if (count = @getCount()) is 0
       @withBlockwise =>
