@@ -129,16 +129,8 @@ describe "vim-mode-plus-move-selected-text", ->
         ensureOverwriteClassForVimStates(allVimState, false)
 
   describe "move up/down", ->
-    textData = null
     beforeEach ->
-      textData = new TextData """
-        line0
-        line1
-        line2\n
-        """
-      set
-        text: textData.getRaw()
-        cursor: [0, 0]
+      set textC: "|line0\nline1\nline2\n"
 
     describe "linewise", ->
       describe "overwrite: false", ->
