@@ -1,8 +1,12 @@
 _ = require 'underscore-plus'
 {
   requireFrom
+  rotateArray
 } = require './utils'
+{Range} = require 'atom'
 
+{inspect} = require 'util'
+p = (args...) -> console.log inspect(args...)
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')
 
@@ -19,7 +23,43 @@ class MoveSelectedTextBase extends Operator
     console.log "still not implemented #{@getName()}"
 
 class MoveSelectedTextUp extends MoveSelectedTextBase
+  direction: 'up'
+
+  canMove: (selection) ->
+    selection.getBufferRange().start.row > 0
+
+  execute: ->
+    for selection in @editor.getSelections()
+      @countTimes @getCount(), =>
+        if @canMove(selection)
+          @moveLinewise(selection)
+
+  moveLinewise: (selection) ->
+    switch @direction
+      when 'up'
+        translationBefore = [[-1, 0], [0, 0]]
+        translationAfter = [[0, 0], [-1, 0]]
+        rotateDirection = 'forward'
+      when 'down'
+        translationBefore = [[0, 0], [1, 0]]
+        translationAfter = [[1, 0], [0, 0]]
+        rotateDirection = 'backward'
+
+    mutateRange = selection.getBufferRange().translate(translationBefore...)
+    @rotateRows(mutateRange, rotateDirection)
+    selection.setBufferRange(mutateRange.translate(translationAfter...))
+
+  rotateRows: (bufferRange, direction) ->
+    text = @editor.getTextInBufferRange(bufferRange).replace(/\n$/, '')
+    rows = text.split("\n")
+    newText = rotateArray(rows, direction).join("\n") + "\n"
+    @editor.setTextInBufferRange(bufferRange, newText)
+
 class MoveSelectedTextDown extends MoveSelectedTextUp
+  direction: 'down'
+
+  canMove: (selection) ->
+    true
 
 class MoveSelectedTextLeft extends MoveSelectedTextBase
   execute: ->

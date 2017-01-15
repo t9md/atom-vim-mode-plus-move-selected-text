@@ -6,10 +6,21 @@ requireFrom = (pack, path) ->
 
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
+rotateArray = (list, direction) ->
+  console.log direction
+  list = list.slice()
+  switch direction
+    when 'forward'
+      last = list.shift()
+      [list..., last]
+    when 'backward'
+      console.log "THIS"
+      first = list.pop()
+      [first, list...]
+
 getSelectedTexts = (editor) ->
   texts = (selection.getText() for selection in editor.getSelections())
   texts.join("\n")
-
 insertTextAtPoint = (editor, point, text) ->
   editor.setTextInBufferRange([point, point], text)
 
@@ -57,6 +68,8 @@ opposite = (direction) ->
 
 module.exports = {
   requireFrom
+  rotateArray
+
   getSelectedTexts
   insertTextAtPoint
   setTextInRangeAndSelect
