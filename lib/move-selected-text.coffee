@@ -1,6 +1,4 @@
-{CompositeDisposable} = require 'atom'
 _ = require 'underscore-plus'
-commandSubscriptions = new CompositeDisposable
 
 {
   requireFrom
@@ -25,9 +23,6 @@ stateManager = new StateManager()
 # Move
 # -------------------------
 class MoveOrDuplicateSelectedText extends Operator
-  @registerCommand: ->
-    commandSubscriptions.add(super)
-
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
@@ -45,87 +40,103 @@ class MoveOrDuplicateSelectedText extends Operator
     else
       submode
 
-  withUndoJoin: (fn) ->
-    stateManager.resetIfNecessary(@editor)
+  withGroupChanges: (fn) ->
+    unless stateManager.isSequentialExecution(@editor)
+      stateManager.reset(@editor)
     @editor.transact(fn)
     stateManager.groupChanges(@editor)
 
 class MoveSelectedText extends MoveOrDuplicateSelectedText
+  hasOverwrittenForSelection: (selection) ->
+    stateManager.get(@editor).overwrittenBySelection.has(selection)
+
+  getOverwrittenForSelection: (selection) ->
+    stateManager.get(@editor).overwrittenBySelection.get(selection)
+
+  setOverwrittenForSelection: (selection, overwritten) ->
+    stateManager.get(@editor).overwrittenBySelection.set(selection, overwritten)
 
 class MoveSelectedTextUp extends MoveSelectedText
-  @registerCommand()
   direction: 'up'
 
   canMove: (selection) ->
-    selection.getBufferRange().start.row > 0
-
-  saveSelectedTextState: ->
-    selectedTexts = @editor.getSelections()
-      .map (selection) -> selection.getText()
-      join('')
+    if @direction is 'up'
+      selection.getBufferRange().start.row > 0
+    else
+      true
 
   execute: ->
-    @withUndoJoin =>
-      if @getWise() is 'linewise' and not @vimState.isMode('visual', 'linewise')
+    wise = @getWise()
+    @withGroupChanges =>
+      if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
         disposable = switchToLinewise(@editor)
 
       @editor.transact =>
         for selection in @editor.getSelections()
           @countTimes @getCount(), =>
-            if @canMove(selection)
-              @moveLinewise(selection)
+            if wise is 'linewise'
+              @moveLinewise(selection) if @canMove(selection)
+            else
+              console.log "NOT YET"
+
       disposable?.dispose()
 
   moveLinewise: (selection) ->
-    [startRow, endRow] = selection.getBufferRowRange()
-    startRow -= 1
-    @rotateRowRange([startRow, endRow])
-    endRow -= 1
-    rangeToSelect = getBufferRangeForRowRange(@editor, [startRow, endRow])
-    selection.setBufferRange(rangeToSelect)
+    reversed = selection.isReversed()
 
-  rotateRowRange: (rowRange) ->
-    bufferRange = getBufferRangeForRowRange(@editor, rowRange)
-    text = @editor.getTextInBufferRange(bufferRange).replace(/\n$/, '')
-    rows = text.split("\n")
-    switch @direction
-      when 'up'
-        newRows = rotateArray(rows, 'forward')
-      when 'down'
-        newRows = rotateArray(rows, 'backward')
-    @editor.setTextInBufferRange(bufferRange, newRows.join("\n") + "\n")
+    if @direction is 'up'
+      rangeToMutate = selection.getBufferRange().translate([-1, 0], [0, 0])
+      selection.setBufferRange(rangeToMutate)
+      rangeToSelect = @rotateSelectedRows(selection).translate([0, 0], [-1, 0])
+      selection.setBufferRange(rangeToSelect, {reversed})
+
+    else if @direction is 'down'
+      rangeToMutate = selection.getBufferRange().translate([0, 0], [1, 0])
+      extendLastBufferRowToRow(@editor, rangeToMutate.end.row)
+      selection.setBufferRange(rangeToMutate)
+      rangeToSelect = @rotateSelectedRows(selection).translate([1, 0], [0, 0])
+      selection.setBufferRange(rangeToSelect, {reversed})
+
+  rotateSelectedRows: (selection) ->
+    if @isOverwriteMode()
+      unless @hasOverwrittenForSelection(selection)
+        [startRow, endRow] = selection.getBufferRowRange()
+        @setOverwrittenForSelection(selection, new Array(endRow - startRow).fill(''))
+      overwritten = @getOverwrittenForSelection(selection)
+    else
+      overwritten = []
+
+    selectedText = selection.getText()
+    rows = selectedText.replace(/\n$/, '').split("\n")
+    rotateDirection =
+      switch @direction
+        when 'up' then 'forward'
+        when 'down' then 'backward'
+    overwritten = rotateArray([rows..., overwritten...], rotateDirection)
+    newRows = overwritten.splice(0, rows.length)
+    if overwritten.length
+      @setOverwrittenForSelection(selection, overwritten)
+    selection.insertText(newRows.join("\n") + "\n")
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
-  @registerCommand()
   direction: 'down'
 
-  canMove: (selection) ->
-    true
-
-  moveLinewise: (selection) ->
-    [startRow, endRow] = selection.getBufferRowRange()
-    endRow += 1
-    extendLastBufferRowToRow(@editor, endRow + 1)
-    @rotateRowRange([startRow, endRow])
-    startRow += 1
-    rangeToSelect = getBufferRangeForRowRange(@editor, [startRow, endRow])
-    selection.setBufferRange(rangeToSelect)
-
 class MoveSelectedTextLeft extends MoveSelectedText
-  @registerCommand()
-
   execute: ->
-    @withUndoJoin =>
+    wise = @getWise()
+
+    @withGroupChanges =>
       for selection in @editor.getSelections()
         @countTimes @getCount(), =>
-          @moveLinewise(selection)
+          if wise is 'linewise'
+            @moveLinewise(selection)
+          else
+            console.log 'not yet implemented'
 
   moveLinewise: (selection) ->
     selection.outdentSelectedRows()
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
-  @registerCommand()
-
   moveLinewise: (selection) ->
     selection.indentSelectedRows()
 
@@ -134,17 +145,25 @@ class MoveSelectedTextRight extends MoveSelectedTextLeft
 class DuplicateSelectedText extends MoveOrDuplicateSelectedText
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
-  @registerCommand()
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
-  @registerCommand()
 
 class DuplicateSelectedTextLeft extends DuplicateSelectedText
-  @registerCommand()
 
 class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
-  @registerCommand()
+
+commands = {
+  MoveSelectedTextUp
+  MoveSelectedTextDown
+  MoveSelectedTextLeft
+  MoveSelectedTextRight
+
+  DuplicateSelectedTextUp
+  DuplicateSelectedTextDown
+  DuplicateSelectedTextLeft
+  DuplicateSelectedTextRight
+}
 
 module.exports = {
-  commandSubscriptions, stateManager
+  stateManager, commands
 }

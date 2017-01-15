@@ -212,7 +212,7 @@ describe "vim-mode-plus-move-selected-text", ->
           ensureMove '1 0 ctrl-j', text: "\n\nline2\n\n\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
           ensureMove '5 ctrl-k', text: "\n\nline2\n\n\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
 
-    describe "characterwise", ->
+    xdescribe "characterwise", ->
       describe "overwrite: false", ->
         beforeEach ->
           set
@@ -380,7 +380,7 @@ describe "vim-mode-plus-move-selected-text", ->
             text_: "line0\nline1\n____line2\nline3\n"
             selectedText_: "line0\nline1\n"
 
-    describe "characterwise", ->
+    xdescribe "characterwise", ->
       describe "overwrite: false", ->
         beforeEach ->
           set
@@ -504,7 +504,7 @@ describe "vim-mode-plus-move-selected-text", ->
             oxYZ@
             """
 
-  describe "duplicate up/down", ->
+  xdescribe "duplicate up/down", ->
     beforeEach ->
       set
         textC: """
@@ -768,7 +768,7 @@ describe "vim-mode-plus-move-selected-text", ->
           ensure 'v l cmd-K',
             mode: ['visual', 'characterwise']
 
-  describe "duplicate right/left", ->
+  xdescribe "duplicate right/left", ->
     describe "linewise", ->
       originalText = null
       beforeEach ->

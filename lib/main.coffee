@@ -33,8 +33,9 @@ module.exports =
     @subscriptions = null
 
   consumeVim: ({observeVimStates}) ->
-    {commandSubscriptions, stateManager} = require("./move-selected-text")
-    @subscriptions.add(commandSubscriptions)
+    {commands, stateManager} = require("./move-selected-text")
+    for name, klass of commands
+      @subscriptions.add(klass.registerCommand())
 
     observeVimStates (vimState) ->
       vimState.modeManager.onDidDeactivateMode ({mode}) ->
