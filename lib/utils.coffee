@@ -35,7 +35,6 @@ ensureBufferEndWithNewLine = (editor) ->
 
 extendLastBufferRowToRow = (editor, row) ->
   if (count = row - editor.getLastBufferRow()) > 0
-    console.log "ExTEND"
     eof = editor.getEofBufferPosition()
     insertTextAtPoint(editor, eof, "\n".repeat(count))
 
@@ -43,6 +42,10 @@ isMultiLineSelection = (selection) ->
   {start, end} = selection.getBufferRange()
   start.row isnt end.row
 
+insertSpacesToPoint = (editor, {row, column}) ->
+  eol = editor.bufferRangeForBufferRow(row).end
+  if (count = column - eol.column) > 0
+    insertTextAtPoint(editor, eol, ' '.repeat(count))
 # Unused
 # -------------------------
 getSelectedTexts = (editor) ->
@@ -53,10 +56,6 @@ setTextInRangeAndSelect = (range, text, selection) ->
   {editor} = selection
   selection.setBufferRange(editor.setTextInBufferRange(range, text))
 
-insertSpacesToPoint = (editor, {row, column}) ->
-  eol = editor.bufferRangeForBufferRow(row).end
-  if (count = column - eol.column) > 0
-    insertTextAtPoint(editor, eol, ' '.repeat(count))
 
 extendLastBufferRowToRow = (editor, row) ->
   if (count = row - editor.getLastBufferRow()) > 0

@@ -212,7 +212,7 @@ describe "vim-mode-plus-move-selected-text", ->
           ensureMove '1 0 ctrl-j', text: "\n\nline2\n\n\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
           ensureMove '5 ctrl-k', text: "\n\nline2\n\n\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
 
-    xdescribe "characterwise", ->
+    describe "characterwise", ->
       describe "overwrite: false", ->
         beforeEach ->
           set

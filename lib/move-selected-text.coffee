@@ -9,6 +9,7 @@ _ = require 'underscore-plus'
   extendLastBufferRowToRow
   switchToLinewise
   isMultiLineSelection
+  insertSpacesToPoint
 } = require './utils'
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 {Range} = require 'atom'
@@ -41,8 +42,7 @@ class MoveOrDuplicateSelectedText extends Operator
       submode
 
   withGroupChanges: (fn) ->
-    unless stateManager.isSequentialExecution(@editor)
-      stateManager.reset(@editor)
+    stateManager.resetIfNecessary(@editor)
     @editor.transact(fn)
     stateManager.groupChanges(@editor)
 
@@ -56,6 +56,11 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
   setOverwrittenForSelection: (selection, overwritten) ->
     stateManager.get(@editor).overwrittenBySelection.set(selection, overwritten)
 
+  swapOverwrittenForSelection: (selection, newValue) ->
+    value = @getOverwrittenForSelection(selection)
+    @setOverwrittenForSelection(selection, newValue)
+    value
+
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
 
@@ -65,21 +70,56 @@ class MoveSelectedTextUp extends MoveSelectedText
     else
       true
 
+  eachSelection: (fn) ->
+    selections = @editor.getSelections()
+    if @direction is 'up'
+      selections.reverse()
+
+    for selection in selections
+      fn(selection)
+
   execute: ->
     wise = @getWise()
     @withGroupChanges =>
       if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
-        disposable = switchToLinewise(@editor)
+        linewiseDisposable = switchToLinewise(@editor)
 
-      @editor.transact =>
-        for selection in @editor.getSelections()
-          @countTimes @getCount(), =>
-            if wise is 'linewise'
+      @countTimes @getCount(), =>
+        @eachSelection (selection) =>
+          switch wise
+            when 'linewise'
               @moveLinewise(selection) if @canMove(selection)
+            when 'characterwise'
+              @moveCharacterwise(selection) if @canMove(selection)
             else
               console.log "NOT YET"
 
-      disposable?.dispose()
+      linewiseDisposable?.dispose()
+
+  moveCharacterwise: (selection) ->
+    reversed = selection.isReversed()
+    srcRange = selection.getBufferRange()
+
+    switch @direction
+      when 'up'
+        dstRange = srcRange.translate([-1, 0])
+      when 'down'
+        dstRange = srcRange.translate([+1, 0])
+        extendLastBufferRowToRow(@editor, dstRange.end.row)
+
+    # Swap text in srcRange with dstRange
+    insertSpacesToPoint(@editor, dstRange.end)
+    srcText = @editor.getTextInBufferRange(srcRange)
+    dstText = @editor.getTextInBufferRange(dstRange)
+
+    if @isOverwriteMode()
+      unless @hasOverwrittenForSelection(selection)
+        @setOverwrittenForSelection(selection, " ".repeat(srcText.length))
+      dstText = @swapOverwrittenForSelection(selection, dstText)
+
+    @editor.setTextInBufferRange(srcRange, dstText)
+    @editor.setTextInBufferRange(dstRange, srcText)
+    selection.setBufferRange(dstRange, {reversed})
 
   moveLinewise: (selection) ->
     reversed = selection.isReversed()
