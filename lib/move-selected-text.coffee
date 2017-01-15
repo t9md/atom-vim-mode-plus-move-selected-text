@@ -2,7 +2,14 @@ _ = require 'underscore-plus'
 {
   requireFrom
   rotateArray
+  insertTextAtPoint
+  ensureBufferEndWithNewLine
+  getBufferRangeForRowRange
+  extendLastBufferRowToRow
+  switchToLinewise
+  isMultiLineSelection
 } = require './utils'
+swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 {Range} = require 'atom'
 
 {inspect} = require 'util'
@@ -22,6 +29,19 @@ class MoveSelectedTextBase extends Operator
   execute: ->
     console.log "still not implemented #{@getName()}"
 
+  getWise: ->
+    {submode} = @vimState
+    if submode is 'characterwise' and @editor.getSelections().some(isMultiLineSelection)
+      'linewise'
+    else
+      submode
+
+  withLinewise: (selection, fn) ->
+    unless @vimState.submode is 'linewise'
+      disposable = switchToLinewise(selection)
+    fn(selection)
+    disposable?.dispose()
+
 class MoveSelectedTextUp extends MoveSelectedTextBase
   direction: 'up'
 
@@ -29,31 +49,35 @@ class MoveSelectedTextUp extends MoveSelectedTextBase
     selection.getBufferRange().start.row > 0
 
   execute: ->
-    for selection in @editor.getSelections()
-      @countTimes @getCount(), =>
-        if @canMove(selection)
-          @moveLinewise(selection)
+    if @getWise() is 'linewise' and not @vimState.isMode('visual', 'linewise')
+      disposable = switchToLinewise(@editor)
+
+    @editor.transact =>
+      for selection in @editor.getSelections()
+        @countTimes @getCount(), =>
+          if @canMove(selection)
+            @moveLinewise(selection)
+
+    disposable?.dispose()
 
   moveLinewise: (selection) ->
-    switch @direction
-      when 'up'
-        translationBefore = [[-1, 0], [0, 0]]
-        translationAfter = [[0, 0], [-1, 0]]
-        rotateDirection = 'forward'
-      when 'down'
-        translationBefore = [[0, 0], [1, 0]]
-        translationAfter = [[1, 0], [0, 0]]
-        rotateDirection = 'backward'
+    [startRow, endRow] = selection.getBufferRowRange()
+    startRow -= 1
+    @rotateRowRange([startRow, endRow])
+    endRow -= 1
+    rangeToSelect = getBufferRangeForRowRange(@editor, [startRow, endRow])
+    selection.setBufferRange(rangeToSelect)
 
-    mutateRange = selection.getBufferRange().translate(translationBefore...)
-    @rotateRows(mutateRange, rotateDirection)
-    selection.setBufferRange(mutateRange.translate(translationAfter...))
-
-  rotateRows: (bufferRange, direction) ->
+  rotateRowRange: (rowRange) ->
+    bufferRange = getBufferRangeForRowRange(@editor, rowRange)
     text = @editor.getTextInBufferRange(bufferRange).replace(/\n$/, '')
     rows = text.split("\n")
-    newText = rotateArray(rows, direction).join("\n") + "\n"
-    @editor.setTextInBufferRange(bufferRange, newText)
+    switch @direction
+      when 'up'
+        newRows = rotateArray(rows, 'forward')
+      when 'down'
+        newRows = rotateArray(rows, 'backward')
+    @editor.setTextInBufferRange(bufferRange, newRows.join("\n") + "\n")
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
@@ -61,11 +85,21 @@ class MoveSelectedTextDown extends MoveSelectedTextUp
   canMove: (selection) ->
     true
 
+  moveLinewise: (selection) ->
+    [startRow, endRow] = selection.getBufferRowRange()
+    endRow += 1
+    extendLastBufferRowToRow(@editor, endRow + 1)
+    @rotateRowRange([startRow, endRow])
+    startRow += 1
+    rangeToSelect = getBufferRangeForRowRange(@editor, [startRow, endRow])
+    selection.setBufferRange(rangeToSelect)
+
 class MoveSelectedTextLeft extends MoveSelectedTextBase
   execute: ->
-    for selection in @editor.getSelections()
-      @countTimes @getCount(), =>
-        @moveLinewise(selection)
+    @editor.transact =>
+      for selection in @editor.getSelections()
+        @countTimes @getCount(), =>
+          @moveLinewise(selection)
 
   moveLinewise: (selection) ->
     selection.outdentSelectedRows()

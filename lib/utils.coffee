@@ -1,3 +1,5 @@
+# Used
+# -------------------------
 {Disposable} = require 'atom'
 
 requireFrom = (pack, path) ->
@@ -7,22 +9,45 @@ requireFrom = (pack, path) ->
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 
 rotateArray = (list, direction) ->
-  console.log direction
   list = list.slice()
   switch direction
     when 'forward'
       last = list.shift()
       [list..., last]
     when 'backward'
-      console.log "THIS"
       first = list.pop()
       [first, list...]
 
+insertTextAtPoint = (editor, point, text) ->
+  editor.setTextInBufferRange([point, point], text)
+
+getBufferRangeForRowRange = (editor, rowRange) ->
+  [startRange, endRange] = rowRange.map (row) ->
+    editor.bufferRangeForBufferRow(row, includeNewline: true)
+  startRange.union(endRange)
+
+# Return new EOF
+ensureBufferEndWithNewLine = (editor) ->
+  eof = editor.getEofBufferPosition()
+  unless eof.column is 0
+    insertTextAtPoint(editor, eof, "\n")
+  editor.getEofBufferPosition()
+
+extendLastBufferRowToRow = (editor, row) ->
+  if (count = row - editor.getLastBufferRow()) > 0
+    console.log "ExTEND"
+    eof = editor.getEofBufferPosition()
+    insertTextAtPoint(editor, eof, "\n".repeat(count))
+
+isMultiLineSelection = (selection) ->
+  {start, end} = selection.getBufferRange()
+  start.row isnt end.row
+
+# Unused
+# -------------------------
 getSelectedTexts = (editor) ->
   texts = (selection.getText() for selection in editor.getSelections())
   texts.join("\n")
-insertTextAtPoint = (editor, point, text) ->
-  editor.setTextInBufferRange([point, point], text)
 
 setTextInRangeAndSelect = (range, text, selection) ->
   {editor} = selection
@@ -38,12 +63,6 @@ extendLastBufferRowToRow = (editor, row) ->
     eof = editor.getEofBufferPosition()
     insertTextAtPoint(editor, eof, "\n".repeat(count))
 
-# Return new EOF
-ensureBufferEndWithNewLine = (editor) ->
-  eof = editor.getEofBufferPosition()
-  insertTextAtPoint(editor, eof, "\n") unless eof.column is 0
-  editor.getEofBufferPosition()
-
 shift = (list, num) ->
   list.splice(0, num)
 
@@ -51,13 +70,12 @@ pop = (list, num) ->
   list.splice(-num, num)
 
 # Return function to restore
-switchToLinewise = (selection) ->
-  selection = swrap(selection)
-  selection.saveProperties()
-  selection.applyWise('linewise')
+switchToLinewise = (editor) ->
+  swrap.saveProperties(editor)
+  swrap.applyWise(editor, 'linewise')
   new Disposable ->
-    selection.normalize()
-    selection.applyWise('characterwise')
+    swrap.normalize(editor)
+    swrap.applyWise(editor, 'characterwise')
 
 opposite = (direction) ->
   switch direction
@@ -69,6 +87,8 @@ opposite = (direction) ->
 module.exports = {
   requireFrom
   rotateArray
+  getBufferRangeForRowRange
+  isMultiLineSelection
 
   getSelectedTexts
   insertTextAtPoint
