@@ -24,13 +24,14 @@ StateManager = require './state-manager'
 stateManager = new StateManager()
 # Move
 # -------------------------
-class MoveSelectedTextBase extends Operator
+class MoveOrDuplicateSelectedText extends Operator
   @registerCommand: ->
     commandSubscriptions.add(super)
 
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
+
   isOverwriteMode: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
 
@@ -49,7 +50,9 @@ class MoveSelectedTextBase extends Operator
     @editor.transact(fn)
     stateManager.groupChanges(@editor)
 
-class MoveSelectedTextUp extends MoveSelectedTextBase
+class MoveSelectedText extends MoveOrDuplicateSelectedText
+
+class MoveSelectedTextUp extends MoveSelectedText
   @registerCommand()
   direction: 'up'
 
@@ -108,8 +111,9 @@ class MoveSelectedTextDown extends MoveSelectedTextUp
     rangeToSelect = getBufferRangeForRowRange(@editor, [startRow, endRow])
     selection.setBufferRange(rangeToSelect)
 
-class MoveSelectedTextLeft extends MoveSelectedTextBase
+class MoveSelectedTextLeft extends MoveSelectedText
   @registerCommand()
+
   execute: ->
     @withUndoJoin =>
       for selection in @editor.getSelections()
@@ -121,28 +125,23 @@ class MoveSelectedTextLeft extends MoveSelectedTextBase
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
   @registerCommand()
+
   moveLinewise: (selection) ->
     selection.indentSelectedRows()
 
 # Duplicate
 # -------------------------
-class DuplicateSelectedTextBase extends Operator
-  @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
-  @commandPrefix: 'vim-mode-plus-user'
-  flashTarget: false
-  isOverwriteMode: ->
-    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+class DuplicateSelectedText extends MoveOrDuplicateSelectedText
 
-  execute: ->
-    console.log "still not implemented #{@getName()}"
-
-class DuplicateSelectedTextUp extends DuplicateSelectedTextBase
+class DuplicateSelectedTextUp extends DuplicateSelectedText
   @registerCommand()
+
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
   @registerCommand()
 
-class DuplicateSelectedTextLeft extends DuplicateSelectedTextBase
+class DuplicateSelectedTextLeft extends DuplicateSelectedText
   @registerCommand()
+
 class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
   @registerCommand()
 
