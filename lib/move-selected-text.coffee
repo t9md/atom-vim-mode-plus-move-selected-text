@@ -69,29 +69,35 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
       @setOverwrittenForSelection(selection, initializer())
     @getOverwrittenForSelection(selection)
 
-class MoveSelectedTextUp extends MoveSelectedText
-  direction: 'up'
-
-  canMove: (selection) ->
-    if @direction is 'up'
-      selection.getBufferRange().start.row > 0
-    else
-      true
+  canMove: (selection, wise) ->
+    switch @direction
+      when 'up'
+        selection.getBufferRange().start.row > 0
+      when 'down', 'right'
+        true
+      when 'left'
+        if wise in ['characterwise', 'blockwise']
+          selection.getBufferRange().start.column > 0
+        else
+          true
 
   execute: ->
     wise = @getWise()
 
     @withGroupChanges =>
-      if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
+      if (@direction in ['up', 'down']) and (wise is 'linewise') and not @vimState.isMode('visual', 'linewise')
         linewiseDisposable = switchToLinewise(@editor)
 
       @countTimes @getCount(), =>
-        for selection in @getSelections() when @canMove(selection)
+        for selection in @getSelections() when @canMove(selection, wise)
           if wise is 'linewise'
             @moveLinewise(selection)
           else
             @moveCharacterwise(selection)
       linewiseDisposable?.dispose()
+
+class MoveSelectedTextUp extends MoveSelectedText
+  direction: 'up'
 
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
@@ -143,15 +149,6 @@ class MoveSelectedTextDown extends MoveSelectedTextUp
 
 class MoveSelectedTextLeft extends MoveSelectedText
   direction: 'left'
-  execute: ->
-    wise = @getWise()
-    @withGroupChanges =>
-      @countTimes @getCount(), =>
-        for selection in @getSelections() when @canMove(selection, wise)
-          if wise is 'linewise'
-            @moveLinewise(selection)
-          else
-            @moveCharacterwise(selection)
 
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
@@ -176,20 +173,8 @@ class MoveSelectedTextLeft extends MoveSelectedText
 
   moveLinewise: (selection) ->
     switch @direction
-      when 'left'
-        selection.outdentSelectedRows()
-      when 'right'
-        selection.indentSelectedRows()
-
-  canMove: (selection, wise) ->
-    switch wise
-      when 'characterwise', 'blockwise'
-        if @direction is 'left'
-          selection.getBufferRange().start.column > 0
-        else
-          true
-      else
-        true
+      when 'left' then selection.outdentSelectedRows()
+      when 'right' then selection.indentSelectedRows()
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
   direction: 'right'
