@@ -380,7 +380,7 @@ describe "vim-mode-plus-move-selected-text", ->
             text_: "line0\nline1\n____line2\nline3\n"
             selectedText_: "line0\nline1\n"
 
-    xdescribe "characterwise", ->
+    describe "characterwise", ->
       describe "overwrite: false", ->
         beforeEach ->
           set

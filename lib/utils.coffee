@@ -46,6 +46,7 @@ insertSpacesToPoint = (editor, {row, column}) ->
   eol = editor.bufferRangeForBufferRow(row).end
   if (count = column - eol.column) > 0
     insertTextAtPoint(editor, eol, ' '.repeat(count))
+
 # Unused
 # -------------------------
 getSelectedTexts = (editor) ->

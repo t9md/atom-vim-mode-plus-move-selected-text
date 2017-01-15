@@ -10,6 +10,7 @@ _ = require 'underscore-plus'
   switchToLinewise
   isMultiLineSelection
   insertSpacesToPoint
+  newArray
 } = require './utils'
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 {Range} = require 'atom'
@@ -56,10 +57,13 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
   setOverwrittenForSelection: (selection, overwritten) ->
     stateManager.get(@editor).overwrittenBySelection.set(selection, overwritten)
 
-  swapOverwrittenForSelection: (selection, newValue) ->
-    value = @getOverwrittenForSelection(selection)
-    @setOverwrittenForSelection(selection, newValue)
-    value
+  getOrInitOverwrittenForSelection: (selection, initializer) ->
+    if @isOverwriteMode()
+      unless @hasOverwrittenForSelection(selection)
+        @setOverwrittenForSelection(selection, initializer())
+      @getOverwrittenForSelection(selection)
+    else
+      []
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
@@ -70,27 +74,22 @@ class MoveSelectedTextUp extends MoveSelectedText
     else
       true
 
-  eachSelection: (fn) ->
-    selections = @editor.getSelections()
-    if @direction is 'up'
-      selections.reverse()
-
-    for selection in selections
-      fn(selection)
-
   execute: ->
     wise = @getWise()
+    selections = @editor.getSelections()
+    selections.reverse() if @direction is 'up'
+
     @withGroupChanges =>
       if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
         linewiseDisposable = switchToLinewise(@editor)
 
       @countTimes @getCount(), =>
-        @eachSelection (selection) =>
+        for selection in selections
           switch wise
             when 'linewise'
-              @moveLinewise(selection) if @canMove(selection)
+              @moveLinewise(selection) if @canMove(selection, wise)
             when 'characterwise'
-              @moveCharacterwise(selection) if @canMove(selection)
+              @moveCharacterwise(selection) if @canMove(selection, wise)
             else
               console.log "NOT YET"
 
@@ -100,22 +99,19 @@ class MoveSelectedTextUp extends MoveSelectedText
     reversed = selection.isReversed()
     srcRange = selection.getBufferRange()
 
-    switch @direction
-      when 'up'
-        dstRange = srcRange.translate([-1, 0])
-      when 'down'
-        dstRange = srcRange.translate([+1, 0])
-        extendLastBufferRowToRow(@editor, dstRange.end.row)
+    dstRange = switch @direction
+      when 'up' then srcRange.translate([-1, 0])
+      when 'down' then srcRange.translate([+1, 0])
 
-    # Swap text in srcRange with dstRange
+    extendLastBufferRowToRow(@editor, dstRange.end.row)
     insertSpacesToPoint(@editor, dstRange.end)
     srcText = @editor.getTextInBufferRange(srcRange)
     dstText = @editor.getTextInBufferRange(dstRange)
 
     if @isOverwriteMode()
-      unless @hasOverwrittenForSelection(selection)
-        @setOverwrittenForSelection(selection, " ".repeat(srcText.length))
-      dstText = @swapOverwrittenForSelection(selection, dstText)
+      overwritten = @getOrInitOverwrittenForSelection(selection, -> " ".repeat(srcText.length))
+      @setOverwrittenForSelection(selection, dstText)
+      dstText = overwritten
 
     @editor.setTextInBufferRange(srcRange, dstText)
     @editor.setTextInBufferRange(dstRange, srcText)
@@ -124,61 +120,97 @@ class MoveSelectedTextUp extends MoveSelectedText
   moveLinewise: (selection) ->
     reversed = selection.isReversed()
 
-    if @direction is 'up'
-      rangeToMutate = selection.getBufferRange().translate([-1, 0], [0, 0])
-      selection.setBufferRange(rangeToMutate)
-      rangeToSelect = @rotateSelectedRows(selection).translate([0, 0], [-1, 0])
-      selection.setBufferRange(rangeToSelect, {reversed})
+    translation = switch @direction
+      when 'up' then {before: [[-1, 0], [0, 0]], after: [[0, 0], [-1, 0]]}
+      when 'down' then {before: [[0, 0], [1, 0]], after: [[1, 0], [0, 0]]}
 
-    else if @direction is 'down'
-      rangeToMutate = selection.getBufferRange().translate([0, 0], [1, 0])
-      extendLastBufferRowToRow(@editor, rangeToMutate.end.row)
-      selection.setBufferRange(rangeToMutate)
-      rangeToSelect = @rotateSelectedRows(selection).translate([1, 0], [0, 0])
-      selection.setBufferRange(rangeToSelect, {reversed})
+    rangeToMutate = selection.getBufferRange().translate(translation.before...)
+    extendLastBufferRowToRow(@editor, rangeToMutate.end.row)
+    selection.setBufferRange(rangeToMutate)
+    rangeToSelect = @rotateSelectedRows(selection).translate(translation.after...)
+    selection.setBufferRange(rangeToSelect, {reversed})
 
   rotateSelectedRows: (selection) ->
-    if @isOverwriteMode()
-      unless @hasOverwrittenForSelection(selection)
-        [startRow, endRow] = selection.getBufferRowRange()
-        @setOverwrittenForSelection(selection, new Array(endRow - startRow).fill(''))
-      overwritten = @getOverwrittenForSelection(selection)
-    else
-      overwritten = []
+    rows = selection.getText().replace(/\n$/, '').split("\n")
 
-    selectedText = selection.getText()
-    rows = selectedText.replace(/\n$/, '').split("\n")
-    rotateDirection =
-      switch @direction
-        when 'up' then 'forward'
-        when 'down' then 'backward'
+    overwritten = @getOrInitOverwrittenForSelection selection, ->
+      new Array(rows.length - 1).fill('')
+
+    rotateDirection = switch @direction
+      when 'up' then 'forward'
+      when 'down' then 'backward'
+
     overwritten = rotateArray([rows..., overwritten...], rotateDirection)
-    newRows = overwritten.splice(0, rows.length)
-    if overwritten.length
-      @setOverwrittenForSelection(selection, overwritten)
-    selection.insertText(newRows.join("\n") + "\n")
+    rows = overwritten.splice(0, rows.length)
+    @setOverwrittenForSelection(selection, overwritten) if overwritten.length
+    selection.insertText(rows.join("\n") + "\n")
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
 
 class MoveSelectedTextLeft extends MoveSelectedText
+  direction: 'left'
   execute: ->
     wise = @getWise()
 
     @withGroupChanges =>
-      for selection in @editor.getSelections()
-        @countTimes @getCount(), =>
-          if wise is 'linewise'
-            @moveLinewise(selection)
-          else
-            console.log 'not yet implemented'
+      @countTimes @getCount(), =>
+        for selection in @editor.getSelections()
+          switch wise
+            when 'linewise'
+              @moveLinewise(selection) if @canMove(selection, wise)
+            when 'characterwise'
+              @moveCharacterwise(selection) if @canMove(selection, wise)
+            else
+              console.log "NOT YET"
+
+  moveCharacterwise: (selection) ->
+    reversed = selection.isReversed()
+
+    translation = switch @direction
+      when 'right' then {before: [[0, 0], [0, 1]], after: [[0, 1], [0, 0]]}
+      when 'left' then {before: [[0, -1], [0, 0]], after: [[0, 0], [0, -1]]}
+
+    rangeToMutate = selection.getBufferRange().translate(translation.before...)
+    insertSpacesToPoint(@editor, rangeToMutate.end)
+    selection.setBufferRange(rangeToMutate)
+    rangeToSelect = @rotateChars(selection).translate(translation.after...)
+    selection.setBufferRange(rangeToSelect, {reversed})
+
+  rotateChars: (selection) ->
+    chars = selection.getText().split('')
+
+    overwritten = @getOrInitOverwrittenForSelection selection, ->
+      new Array(chars.length - 1).fill(' ')
+
+    rotateDirection = switch @direction
+      when 'right' then 'backward'
+      when 'left' then 'forward'
+
+    overwritten = rotateArray([chars..., overwritten...], rotateDirection)
+    chars = overwritten.splice(0, chars.length)
+    @setOverwrittenForSelection(selection, overwritten) if overwritten.length
+    selection.insertText(chars.join(""))
 
   moveLinewise: (selection) ->
-    selection.outdentSelectedRows()
+    switch @direction
+      when 'left'
+        selection.outdentSelectedRows()
+      when 'right'
+        selection.indentSelectedRows()
+
+  canMove: (selection, wise) ->
+    switch @direction
+      when 'left'
+        if wise is 'characterwise'
+          selection.getBufferRange().start.column > 0
+        else
+          true
+      when 'right'
+        true
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
-  moveLinewise: (selection) ->
-    selection.indentSelectedRows()
+  direction: 'right'
 
 # Duplicate
 # -------------------------
