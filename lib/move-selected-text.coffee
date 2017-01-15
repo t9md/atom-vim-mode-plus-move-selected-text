@@ -1,4 +1,7 @@
+{CompositeDisposable} = require 'atom'
 _ = require 'underscore-plus'
+commandSubscriptions = new CompositeDisposable
+
 {
   requireFrom
   rotateArray
@@ -17,9 +20,14 @@ p = (args...) -> console.log inspect(args...)
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')
 
+StateManager = require './state-manager'
+stateManager = new StateManager()
 # Move
 # -------------------------
 class MoveSelectedTextBase extends Operator
+  @registerCommand: ->
+    commandSubscriptions.add(super)
+
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
@@ -36,29 +44,34 @@ class MoveSelectedTextBase extends Operator
     else
       submode
 
-  withLinewise: (selection, fn) ->
-    unless @vimState.submode is 'linewise'
-      disposable = switchToLinewise(selection)
-    fn(selection)
-    disposable?.dispose()
+  withUndoJoin: (fn) ->
+    stateManager.resetIfNecessary(@editor)
+    @editor.transact(fn)
+    stateManager.groupChanges(@editor)
 
 class MoveSelectedTextUp extends MoveSelectedTextBase
+  @registerCommand()
   direction: 'up'
 
   canMove: (selection) ->
     selection.getBufferRange().start.row > 0
 
+  saveSelectedTextState: ->
+    selectedTexts = @editor.getSelections()
+      .map (selection) -> selection.getText()
+      join('')
+
   execute: ->
-    if @getWise() is 'linewise' and not @vimState.isMode('visual', 'linewise')
-      disposable = switchToLinewise(@editor)
+    @withUndoJoin =>
+      if @getWise() is 'linewise' and not @vimState.isMode('visual', 'linewise')
+        disposable = switchToLinewise(@editor)
 
-    @editor.transact =>
-      for selection in @editor.getSelections()
-        @countTimes @getCount(), =>
-          if @canMove(selection)
-            @moveLinewise(selection)
-
-    disposable?.dispose()
+      @editor.transact =>
+        for selection in @editor.getSelections()
+          @countTimes @getCount(), =>
+            if @canMove(selection)
+              @moveLinewise(selection)
+      disposable?.dispose()
 
   moveLinewise: (selection) ->
     [startRow, endRow] = selection.getBufferRowRange()
@@ -80,6 +93,7 @@ class MoveSelectedTextUp extends MoveSelectedTextBase
     @editor.setTextInBufferRange(bufferRange, newRows.join("\n") + "\n")
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
+  @registerCommand()
   direction: 'down'
 
   canMove: (selection) ->
@@ -95,8 +109,9 @@ class MoveSelectedTextDown extends MoveSelectedTextUp
     selection.setBufferRange(rangeToSelect)
 
 class MoveSelectedTextLeft extends MoveSelectedTextBase
+  @registerCommand()
   execute: ->
-    @editor.transact =>
+    @withUndoJoin =>
       for selection in @editor.getSelections()
         @countTimes @getCount(), =>
           @moveLinewise(selection)
@@ -105,6 +120,7 @@ class MoveSelectedTextLeft extends MoveSelectedTextBase
     selection.outdentSelectedRows()
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
+  @registerCommand()
   moveLinewise: (selection) ->
     selection.indentSelectedRows()
 
@@ -121,15 +137,15 @@ class DuplicateSelectedTextBase extends Operator
     console.log "still not implemented #{@getName()}"
 
 class DuplicateSelectedTextUp extends DuplicateSelectedTextBase
+  @registerCommand()
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
+  @registerCommand()
 
 class DuplicateSelectedTextLeft extends DuplicateSelectedTextBase
+  @registerCommand()
 class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
+  @registerCommand()
 
 module.exports = {
-  MoveSelectedTextUp, MoveSelectedTextDown
-  MoveSelectedTextLeft, MoveSelectedTextRight
-
-  DuplicateSelectedTextUp, DuplicateSelectedTextDown
-  DuplicateSelectedTextLeft, DuplicateSelectedTextRight
+  commandSubscriptions, stateManager
 }

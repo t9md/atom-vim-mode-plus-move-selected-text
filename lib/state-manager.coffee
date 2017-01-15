@@ -5,40 +5,29 @@
 class State
   selectedTexts: null
   checkpoint: null
-  overwrittenBySelection: null
-  editor: null
-
-  constructor: (@editor) ->
-
-  isSequential: ->
-    @selectedTexts is getSelectedTexts(@editor)
-
-  init: ->
-    @checkpoint = @editor.createCheckpoint()
-    @overwrittenBySelection = null
-
-  updateSelectedTexts: ->
-    @selectedTexts = getSelectedTexts(@editor)
-
-  groupChanges: ->
-    unless @checkpoint?
-      throw new Error("called GroupChanges with @checkpoint undefined")
-    @editor.groupChangesSinceCheckpoint(@checkpoint)
+  constructor: (@checkpoint) ->
 
 class StateManager
   constructor: ->
     @stateByEditor = new Map
 
-  set: (editor) ->
-    @stateByEditor.set(editor, new State(editor))
+  resetIfNecessary: (editor) ->
+    state = @stateByEditor.get(editor)
+    unless (state? and state.selectedTexts is getSelectedTexts(editor))
+      @stateByEditor.set(editor, new State(editor.createCheckpoint()))
 
-  get: (editor) ->
-    @stateByEditor.get(editor)
-
-  has: (editor) ->
-    @stateByEditor.has(editor)
-
-  remove: (editor) ->
+  delete: (editor) ->
     @stateByEditor.delete(editor)
+
+  update: (editor) ->
+    @stateByEditor.get(editor).selectedTexts = getSelectedTexts(editor)
+
+  groupChanges: (editor) ->
+    state = @stateByEditor.get(editor)
+    unless state.checkpoint?
+      throw new Error("called GroupChanges with @checkpoint undefined")
+
+    editor.groupChangesSinceCheckpoint(state.checkpoint)
+    @update(editor)
 
 module.exports = StateManager
