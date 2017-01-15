@@ -768,7 +768,7 @@ describe "vim-mode-plus-move-selected-text", ->
           ensure 'v l cmd-K',
             mode: ['visual', 'characterwise']
 
-  xdescribe "duplicate right/left", ->
+  describe "duplicate right/left", ->
     describe "linewise", ->
       originalText = null
       beforeEach ->
@@ -820,7 +820,7 @@ describe "vim-mode-plus-move-selected-text", ->
             2 very long |_2 very long |_2 very long |_
 
             """
-      describe "overwrite: true", ->
+      xdescribe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
 
@@ -851,7 +851,7 @@ describe "vim-mode-plus-move-selected-text", ->
             selectedBufferRange: rowRange(0, 2)
             text: originalText
 
-    describe "characterwise", ->
+    xdescribe "characterwise", ->
       describe "overwrite: false", ->
         beforeEach ->
           set

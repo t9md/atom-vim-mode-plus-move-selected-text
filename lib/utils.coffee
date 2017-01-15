@@ -92,7 +92,6 @@ setTextInRangeAndSelect = (range, text, selection) ->
   {editor} = selection
   selection.setBufferRange(editor.setTextInBufferRange(range, text))
 
-
 extendLastBufferRowToRow = (editor, row) ->
   if (count = row - editor.getLastBufferRow()) > 0
     eof = editor.getEofBufferPosition()

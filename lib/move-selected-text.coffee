@@ -199,12 +199,41 @@ class MoveSelectedTextRight extends MoveSelectedTextLeft
 class DuplicateSelectedText extends MoveOrDuplicateSelectedText
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
+  direction: 'up'
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
+  direction: 'down'
 
 class DuplicateSelectedTextLeft extends DuplicateSelectedText
+  direction: 'left'
+  execute: ->
+    wise = @getWise()
+
+    if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
+      linewiseDisposable = switchToLinewise(@editor)
+
+    # @countTimes @getCount(), =>
+    for selection in @editor.getSelections()# when @canDuplicate(selection, wise)
+      if wise is 'linewise'
+        @duplicateLinewise(selection)
+      else
+        @duplicateCharacterwise(selection)
+
+    linewiseDisposable?.dispose()
+
+  # No behavior diff by isOverwriteMode() and direction('left' or 'right')
+  duplicateLinewise: (selection) ->
+    reversed = selection.isReversed()
+    count = @getCount()
+    [startRow, endRow ] = selection.getBufferRowRange()
+    newText = [startRow..endRow]
+      .map (row) => @editor.lineTextForBufferRow(row).repeat(count + 1)
+      .join("\n") + "\n"
+    newRange = selection.insertText(newText)
+    selection.setBufferRange(newRange, {reversed})
 
 class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
+  direction: 'right'
 
 commands = {
   MoveSelectedTextUp
