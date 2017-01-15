@@ -4,7 +4,6 @@ _ = require 'underscore-plus'
   requireFrom
   rotateArray
   insertTextAtPoint
-  ensureBufferEndWithNewLine
   getBufferRangeForRowRange
   extendLastBufferRowToRow
   switchToLinewise
@@ -12,6 +11,7 @@ _ = require 'underscore-plus'
   insertSpacesToPoint
   rotateChars
   rotateRows
+  ensureBufferEndWithNewLine
 } = require './utils'
 swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 {Range} = require 'atom'
@@ -48,6 +48,12 @@ class MoveOrDuplicateSelectedText extends Operator
     @editor.transact(fn)
     stateManager.groupChanges(@editor)
 
+  getSelections: ->
+    selections = @editor.getSelectionsOrderedByBufferPosition()
+    if @direction is 'down'
+      selections.reverse()
+    selections
+
 class MoveSelectedText extends MoveOrDuplicateSelectedText
   hasOverwrittenForSelection: (selection) ->
     stateManager.get(@editor).overwrittenBySelection.has(selection)
@@ -62,12 +68,6 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
     unless @hasOverwrittenForSelection(selection)
       @setOverwrittenForSelection(selection, initializer())
     @getOverwrittenForSelection(selection)
-
-  getSelections: ->
-    selections = @editor.getSelectionsOrderedByBufferPosition()
-    if @direction is 'down'
-      selections.reverse()
-    selections
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
@@ -200,6 +200,43 @@ class DuplicateSelectedText extends MoveOrDuplicateSelectedText
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
   direction: 'up'
+  execute: ->
+    wise = @getWise()
+
+    if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
+      linewiseDisposable = switchToLinewise(@editor)
+
+    for selection in @getSelections()
+      if wise is 'linewise'
+        @duplicateLinewise(selection)
+      else
+        @duplicateCharacterwise(selection)
+
+    linewiseDisposable?.dispose()
+
+  duplicateLinewise: (selection) ->
+    reversed = selection.isReversed()
+    count = @getCount()
+    [startRow, endRow ] = selection.getBufferRowRange()
+    rows = [startRow..endRow].map (row) => @editor.lineTextForBufferRow(row)
+    height = rows.length * count
+    newText = (rows.join("\n") + "\n").repeat(count)
+
+    {start, end} = selection.getBufferRange()
+    if @direction is 'down' and end.isEqual(@editor.getEofBufferPosition())
+      end = ensureBufferEndWithNewLine(@editor)
+
+    if @isOverwriteMode()
+      rangeToMutate = switch @direction
+        when 'up' then [start.translate([-height, 0]), start]
+        when 'down' then [end, end.translate([+height, 0])]
+    else
+      rangeToMutate = switch @direction
+        when 'up' then [start, start]
+        when 'down' then [end, end]
+
+    newRange = @editor.setTextInBufferRange(rangeToMutate, newText)
+    selection.setBufferRange(newRange, {reversed})
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
   direction: 'down'
