@@ -74,6 +74,12 @@ class MoveSelectedTextUp extends MoveSelectedText
     else
       true
 
+  getSelections: ->
+    selections = @editor.getSelectionsOrderedByBufferPosition()
+    if @direction is 'down'
+      selections.reverse()
+    selections
+
   execute: ->
     wise = @getWise()
     selections = @editor.getSelections()
@@ -84,14 +90,14 @@ class MoveSelectedTextUp extends MoveSelectedText
         linewiseDisposable = switchToLinewise(@editor)
 
       @countTimes @getCount(), =>
-        for selection in selections
+        for selection in @getSelections()
           switch wise
             when 'linewise'
               @moveLinewise(selection) if @canMove(selection, wise)
             when 'characterwise'
               @moveCharacterwise(selection) if @canMove(selection, wise)
             else
-              console.log "NOT YET"
+              @moveCharacterwise(selection) if @canMove(selection, wise)
 
       linewiseDisposable?.dispose()
 
@@ -119,15 +125,14 @@ class MoveSelectedTextUp extends MoveSelectedText
 
   moveLinewise: (selection) ->
     reversed = selection.isReversed()
-
     translation = switch @direction
-      when 'up' then {before: [[-1, 0], [0, 0]], after: [[0, 0], [-1, 0]]}
-      when 'down' then {before: [[0, 0], [1, 0]], after: [[1, 0], [0, 0]]}
+      when 'up' then [[-1, 0], [0, 0]]
+      when 'down' then [[0, 0], [1, 0]]
 
-    rangeToMutate = selection.getBufferRange().translate(translation.before...)
+    rangeToMutate = selection.getBufferRange().translate(translation...)
     extendLastBufferRowToRow(@editor, rangeToMutate.end.row)
     selection.setBufferRange(rangeToMutate)
-    rangeToSelect = @rotateSelectedRows(selection).translate(translation.after...)
+    rangeToSelect = @rotateSelectedRows(selection).translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, {reversed})
 
   rotateSelectedRows: (selection) ->
@@ -166,15 +171,14 @@ class MoveSelectedTextLeft extends MoveSelectedText
 
   moveCharacterwise: (selection) ->
     reversed = selection.isReversed()
-
     translation = switch @direction
-      when 'right' then {before: [[0, 0], [0, 1]], after: [[0, 1], [0, 0]]}
-      when 'left' then {before: [[0, -1], [0, 0]], after: [[0, 0], [0, -1]]}
+      when 'right' then [[0, 0], [0, 1]]
+      when 'left' then [[0, -1], [0, 0]]
 
-    rangeToMutate = selection.getBufferRange().translate(translation.before...)
+    rangeToMutate = selection.getBufferRange().translate(translation...)
     insertSpacesToPoint(@editor, rangeToMutate.end)
     selection.setBufferRange(rangeToMutate)
-    rangeToSelect = @rotateChars(selection).translate(translation.after...)
+    rangeToSelect = @rotateChars(selection).translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, {reversed})
 
   rotateChars: (selection) ->
