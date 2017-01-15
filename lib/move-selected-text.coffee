@@ -173,8 +173,10 @@ class MoveSelectedTextLeft extends MoveSelectedText
 
   moveLinewise: (selection) ->
     switch @direction
-      when 'left' then selection.outdentSelectedRows()
-      when 'right' then selection.indentSelectedRows()
+      when 'left'
+        selection.outdentSelectedRows()
+      when 'right'
+        selection.indentSelectedRows()
 
 class MoveSelectedTextRight extends MoveSelectedTextLeft
   direction: 'right'
