@@ -12,15 +12,27 @@ class MoveSelectedTextBase extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
+  isOverwriteMode: ->
+    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+
   execute: ->
     console.log "still not implemented #{@getName()}"
-
 
 class MoveSelectedTextUp extends MoveSelectedTextBase
 class MoveSelectedTextDown extends MoveSelectedTextUp
 
 class MoveSelectedTextLeft extends MoveSelectedTextBase
+  execute: ->
+    for selection in @editor.getSelections()
+      @countTimes @getCount(), =>
+        @moveLinewise(selection)
+
+  moveLinewise: (selection) ->
+    selection.outdentSelectedRows()
+
 class MoveSelectedTextRight extends MoveSelectedTextLeft
+  moveLinewise: (selection) ->
+    selection.indentSelectedRows()
 
 # Duplicate
 # -------------------------
@@ -28,6 +40,9 @@ class DuplicateSelectedTextBase extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
+  isOverwriteMode: ->
+    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
+
   execute: ->
     console.log "still not implemented #{@getName()}"
 
