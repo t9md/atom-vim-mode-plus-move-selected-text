@@ -1,3 +1,6 @@
+## 0.7.0
+- Fix: Still not perfect but now works in latest vim-mode-plus(v0.80.0).
+
 ## 0.6.2
 - Fix: Deprecation warning for use of `::shadow`. #2
 
