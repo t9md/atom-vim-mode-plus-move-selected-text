@@ -47,6 +47,41 @@ insertSpacesToPoint = (editor, {row, column}) ->
   if (count = column - eol.column) > 0
     insertTextAtPoint(editor, eol, ' '.repeat(count))
 
+rotateRows = (selection, direction, {overwritten}={}) ->
+  overwritten ?= []
+  rows = selection.getText().replace(/\n$/, '').split("\n")
+  switch direction
+    when 'up'
+      overwritten = rotateArray([rows..., overwritten...], 'forward')
+    when 'down'
+      overwritten = rotateArray([rows..., overwritten...], 'backward')
+  rows = overwritten.splice(0, rows.length)
+  newRange = selection.insertText(rows.join("\n") + "\n")
+  {newRange, overwritten}
+
+rotateChars = (selection, direction, {overwritten}={}) ->
+  chars = selection.getText().split('')
+  switch direction
+    when 'right'
+      [other..., char] = chars
+      if overwritten?
+        chars = [overwritten.shift(), other...]
+        overwritten.push(char)
+      else
+        chars = [char, other...]
+        overwritten = []
+    when 'left'
+      [char, other...,] = chars
+      if overwritten?
+        chars = [other..., overwritten.pop()]
+        overwritten.unshift(char)
+      else
+        chars = [other..., char]
+        overwritten = []
+
+  newRange = selection.insertText(chars.join(""))
+  {newRange, overwritten}
+
 # Unused
 # -------------------------
 getSelectedTexts = (editor) ->
@@ -89,6 +124,8 @@ module.exports = {
   rotateArray
   getBufferRangeForRowRange
   isMultiLineSelection
+  rotateChars
+  rotateRows
 
   getSelectedTexts
   insertTextAtPoint
