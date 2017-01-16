@@ -95,25 +95,10 @@ setBufferRangesForBlockwiseSelection = (blockwiseSelection, ranges) ->
 insertBlankRowAtPoint = (editor, point, count) ->
   insertTextAtPoint(editor, point, "\n".repeat(count))
 
-# Update selected bufferRange to range returned by callback
-setBufferRangeForSelectionBy = (selection, fn) ->
-  reversed = selection.isReversed()
-  newRange = fn()
-  if newRange?
-    selection.setBufferRange(newRange, {reversed})
-
 # Return mutated range
 replaceBufferRangeBy = (editor, range, fn) ->
   oldText = editor.getTextInBufferRange(range)
   editor.setTextInBufferRange(range, fn(oldText))
-
-replaceRangeAndSelect = (selection, range, {translation}={}, fn) ->
-  setBufferRangeForSelectionBy selection, ->
-    newRange = replaceBufferRangeBy(selection.editor, range, fn)
-    if translation?
-      newRange.translate(translation...)
-    else
-      newRange
 
 baseMixin =
   isOverwriteMode: ->
@@ -151,6 +136,4 @@ module.exports = {
   insertBlankRowAtPoint
   includeBaseMixin
   replaceBufferRangeBy
-  setBufferRangeForSelectionBy
-  replaceRangeAndSelect
 }

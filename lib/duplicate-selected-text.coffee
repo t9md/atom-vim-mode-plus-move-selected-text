@@ -9,8 +9,6 @@
   setBufferRangesForBlockwiseSelection
   insertBlankRowAtPoint
   includeBaseMixin
-  setBufferRangeForSelectionBy
-  replaceRangeAndSelect
 } = require './utils'
 
 Base = requireFrom('vim-mode-plus', 'base')
@@ -84,8 +82,8 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
         else
           [end, end]
 
-    setBufferRangeForSelectionBy selection, =>
-      @editor.setTextInBufferRange(rangeToMutate, newText)
+    newRange = @editor.setTextInBufferRange(rangeToMutate, newText)
+    selection.setBufferRange(newRange, reversed: selection.isReversed())
 
   duplicateBlockwise: (blockwiseSelection)  ->
     count = @getCount()
@@ -132,10 +130,10 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedText
   # No behavior diff by isOverwriteMode() and direction('left' or 'right')
   duplicateLinewise: (selection) ->
     amount = @getCount() + 1
-    replaceRangeAndSelect selection, selection.getBufferRange(), {}, (text) ->
-      text.split("\n")
-        .map (rowText) -> rowText.repeat(amount)
-        .join("\n")
+    newText = selection.getText().split("\n")
+      .map (rowText) -> rowText.repeat(amount)
+      .join("\n")
+    selection.insertText(newText, select: true)
 
   duplicateCharacterwise: (selection) ->
     count = @getCount()
@@ -154,8 +152,8 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedText
         else
           [end, end]
 
-    setBufferRangeForSelectionBy selection, =>
-      @editor.setTextInBufferRange(rangeToMutate, newText)
+    newRange = @editor.setTextInBufferRange(rangeToMutate, newText)
+    selection.setBufferRange(newRange, reversed: selection.isReversed())
 
 class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
   direction: 'right'

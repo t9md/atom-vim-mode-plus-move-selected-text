@@ -7,7 +7,7 @@
   rotateChars
   rotateRows
   includeBaseMixin
-  replaceRangeAndSelect
+  replaceBufferRangeBy
 } = require './utils'
 
 Base = requireFrom('vim-mode-plus', 'base')
@@ -111,11 +111,13 @@ class MoveSelectedTextUp extends MoveSelectedText
         new Array(height).fill('')
 
     translation.reverse()
-    replaceRangeAndSelect selection, rangeToMutate, {translation}, (text) =>
+    newRange = replaceBufferRangeBy @editor, rangeToMutate, (text) =>
       rows = text.replace(/\n$/, '').split("\n")
       {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
       @setOverwrittenForSelection(selection, overwritten) if overwritten.length
       rows.join("\n") + "\n"
+
+    selection.setBufferRange(newRange.translate(translation...), reversed: selection.isReversed())
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
@@ -138,10 +140,11 @@ class MoveSelectedTextLeft extends MoveSelectedText
         new Array(textLength).fill(' ')
 
     translation.reverse()
-    replaceRangeAndSelect selection, rangeToMutate, {translation}, (text) =>
+    newRange = replaceBufferRangeBy @editor, rangeToMutate, (text) =>
       {chars, overwritten} = rotateChars(text.split(''), @direction, {overwritten})
       @setOverwrittenForSelection(selection, overwritten) if overwritten.length
       chars.join('')
+    selection.setBufferRange(newRange.translate(translation...), reversed: selection.isReversed())
 
   moveLinewise: (selection) ->
     switch @direction
