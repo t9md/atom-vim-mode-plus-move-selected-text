@@ -1,44 +1,51 @@
-{
-  getSelectedTexts
-} = require './utils'
+getSelectedTexts = (editor) ->
+  texts = (selection.getText() for selection in editor.getSelections())
+  texts.join("\n")
 
 class State
   selectedTexts: null
   checkpoint: null
-  overwrittenBySelection: null
-  editor: null
-
-  constructor: (@editor) ->
-
-  isSequential: ->
-    @selectedTexts is getSelectedTexts(@editor)
-
-  init: ->
-    @checkpoint = @editor.createCheckpoint()
-    @overwrittenBySelection = null
-
-  updateSelectedTexts: ->
-    @selectedTexts = getSelectedTexts(@editor)
-
-  groupChanges: ->
-    unless @checkpoint?
-      throw new Error("called GroupChanges with @checkpoint undefined")
-    @editor.groupChangesSinceCheckpoint(@checkpoint)
+  constructor: (@checkpoint) ->
+    @overwrittenBySelection = new Map()
 
 class StateManager
   constructor: ->
     @stateByEditor = new Map
 
-  set: (editor) ->
-    @stateByEditor.set(editor, new State(editor))
+  resetIfNecessary: (editor) ->
+    @reset(editor) unless @isSequentialExecution(editor)
+
+  reset: (editor) ->
+    @stateByEditor.set(editor, new State(editor.createCheckpoint()))
+
+  isSequentialExecution: (editor) ->
+    state = @stateByEditor.get(editor)
+    state? and state.selectedTexts is getSelectedTexts(editor)
 
   get: (editor) ->
     @stateByEditor.get(editor)
 
-  has: (editor) ->
-    @stateByEditor.has(editor)
-
-  remove: (editor) ->
+  delete: (editor) ->
     @stateByEditor.delete(editor)
+
+  update: (editor) ->
+    @stateByEditor.get(editor).selectedTexts = getSelectedTexts(editor)
+
+  groupChanges: (editor) ->
+    state = @stateByEditor.get(editor)
+    unless state.checkpoint?
+      throw new Error("called GroupChanges with @checkpoint undefined")
+
+    editor.groupChangesSinceCheckpoint(state.checkpoint)
+    @update(editor)
+
+  setOverwrittenForSelection: (selection, overwritten) ->
+    @stateByEditor.get(selection.editor).overwrittenBySelection.set(selection, overwritten)
+
+  getOverwrittenForSelection: (selection) ->
+    @stateByEditor.get(selection.editor).overwrittenBySelection.get(selection)
+
+  hasOverwrittenForSelection: (selection) ->
+    @stateByEditor.get(selection.editor).overwrittenBySelection.has(selection)
 
 module.exports = StateManager

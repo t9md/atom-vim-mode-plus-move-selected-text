@@ -1,4 +1,4 @@
-{CompositeDisposable} = require 'atom'
+{CompositeDisposable, Disposable} = require 'atom'
 
 OverwriteConfig = 'vim-mode-plus-move-selected-text.overwrite'
 OverwriteClass = 'vim-mode-plus-move-selected-text-overwrite'
@@ -13,6 +13,10 @@ module.exports =
   activate: ->
     @subscriptions = new CompositeDisposable
 
+    @subscriptions.add new Disposable ->
+      for editor in atom.workspace.getTextEditors()
+        editor.element.classList.remove(OverwriteClass)
+
     @subscriptions.add atom.workspace.observeTextEditors (editor) ->
       editor.element.classList.toggle(OverwriteClass, atom.config.get(OverwriteConfig))
 
@@ -26,14 +30,15 @@ module.exports =
 
   deactivate: ->
     @subscriptions?.dispose()
-    @subscriptions = {}
+    @subscriptions = null
 
-    for editor in atom.workspace.getTextEditors()
-      editor.element.classList.remove(OverwriteClass)
+  consumeVim: ({observeVimStates}) ->
+    {commands, stateManager} = require("./move-selected-text")
 
-  subscribe: (args...) ->
-    @subscriptions.add args...
-
-  consumeVim: ->
-    for name, klass of require("./move-selected-text")
+    for name, klass of commands
       @subscriptions.add(klass.registerCommand())
+
+    observeVimStates (vimState) ->
+      vimState.modeManager.onDidDeactivateMode ({mode}) ->
+        if mode is 'visual'
+          stateManager.delete(vimState.editor)
