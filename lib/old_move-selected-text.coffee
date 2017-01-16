@@ -67,154 +67,6 @@ class MoveSelectedText extends Operator
     fn(selection)
     disposable?.dispose()
 
-# Up/Down
-class MoveSelectedTextUp extends MoveSelectedText
-  direction: 'up'
-
-  initialize: ->
-    stateManager.set(@editor) unless stateManager.has(@editor)
-    unless disposableByEditor.has(@editor)
-      disposable = @vimState.modeManager.onDidDeactivateMode ({mode}) =>
-        stateManager.remove(@editor) if mode is 'visual'
-
-      disposableByEditor.set @editor, @editor.onDidDestroy =>
-        disposable.dispose()
-        disposableByEditor.delete(@editor)
-        stateManager.remove(@editor)
-
-    super
-
-  getInitialOverwrittenBySelection: ->
-    overwrittenBySelection = new Map
-
-    getInitalAreaForSelection = (selection) =>
-      text = if @isLinewise()
-        height = swrap(selection).getRowCount()
-        "\n".repeat(height)
-      else
-        width = selection.getBufferRange().getExtent().column
-        ' '.repeat(width)
-      new Area(text, @isLinewise())
-
-    for selection in @editor.getSelections()
-      area = getInitalAreaForSelection(selection)
-      overwrittenBySelection.set(selection, area)
-    overwrittenBySelection
-
-  withUndoJoin: (fn) ->
-    state = stateManager.get(@editor)
-    state.init() unless state.isSequential()
-    unless state.overwrittenBySelection?
-      state.overwrittenBySelection = @getInitialOverwrittenBySelection()
-
-    fn()
-    state.updateSelectedTexts()
-    state.groupChanges()
-
-  # Used by
-  # - up: linewise
-  # - down: linewise
-  # - right: characterwise
-  # - left: characterwise
-  rotateTextForSelection: (selection) ->
-    reversed = selection.isReversed()
-    translation = switch @direction
-      when 'up' then [[-1, 0], [0, 0]]
-      when 'down' then [[0, 0], [1, 0]]
-      when 'right' then [[0, 0], [0, +1]]
-      when 'left' then [[0, -1], [0, 0]]
-
-    if @direction is 'down'
-      if selection.getBufferRange().end.row is @editor.getLastBufferRow()
-        ensureBufferEndWithNewLine(@editor)
-
-    range = selection.getBufferRange().translate(translation...)
-    if @direction is 'down' # auto insert new linew at last row
-      extendLastBufferRowToRow(@editor, range.end.row)
-
-    if @isOverwriteMode()
-      overwrittenArea = stateManager.get(@editor).overwrittenBySelection.get(selection)
-    area = new Area(@editor.getTextInBufferRange(range), @isLinewise(), overwrittenArea)
-    range = @editor.setTextInBufferRange(range, area.getTextByRotate(@direction))
-    range = range.translate(translation.reverse()...)
-    selection.setBufferRange(range, {reversed})
-
-  # Return 0 when no longer movable
-  getCount: ->
-    count = super
-    if @direction is 'up'
-      topSelection = @editor.getSelectionsOrderedByBufferPosition()[0]
-      startRow = topSelection.getBufferRange().start.row
-      Math.min(startRow, count)
-    else
-      count
-
-  execute: ->
-    @withUndoJoin =>
-      selections = @editor.getSelectionsOrderedByBufferPosition()
-      selections.reverse() if @direction is 'down'
-      @editor.transact =>
-        @countTimes @getCount(), =>
-          for selection in selections
-            if @isLinewise()
-              @moveLinewise(selection)
-            else
-              @moveCharacterwise(selection)
-
-  moveLinewise: (selection) ->
-    @withLinewise selection, =>
-      @rotateTextForSelection(selection)
-    @editor.scrollToCursorPosition({center: true})
-
-  moveCharacterwise: (selection) ->
-    reversed = selection.isReversed()
-    translation = switch @direction
-      when 'up' then [[-1, 0]]
-      when 'down' then [[+1, 0]]
-
-    fromRange = selection.getBufferRange()
-    toRange = fromRange.translate(translation...)
-
-    extendLastBufferRowToRow(@editor, toRange.end.row)
-    # Swap text from fromRange to toRange
-    insertSpacesToPoint(@editor, toRange.end)
-    movingText = @editor.getTextInBufferRange(fromRange)
-    replacedText = @editor.getTextInBufferRange(toRange)
-
-    if @isOverwriteMode()
-      area = stateManager.get(@editor).overwrittenBySelection.get(selection)
-      replacedText = area.pushOut(replacedText, opposite(@direction))
-    @editor.setTextInBufferRange(fromRange, replacedText)
-    @editor.setTextInBufferRange(toRange, movingText)
-
-    selection.setBufferRange(toRange, {reversed})
-
-class MoveSelectedTextDown extends MoveSelectedTextUp
-  direction: 'down'
-
-# Left/Right
-class MoveSelectedTextLeft extends MoveSelectedTextUp
-  direction: 'left'
-
-  moveLinewise: (selection) ->
-    switch @direction
-      when 'left' then selection.outdentSelectedRows()
-      when 'right' then selection.indentSelectedRows()
-
-  moveCharacterwise: (selection) ->
-    if @direction is 'left'
-      return unless selection.getBufferRange().start.column > 0
-
-    if @direction is 'right'
-      endPoint = selection.getBufferRange().end
-      insertTextAtPoint(@editor, endPoint, " ") if pointIsAtEndOfLine(@editor, endPoint)
-
-    @rotateTextForSelection(selection)
-    @editor.scrollToCursorPosition(center: true)
-
-class MoveSelectedTextRight extends MoveSelectedTextLeft
-  direction: 'right'
-
 # Duplicate
 # -------------------------
 class DuplicateSelectedText extends MoveSelectedText
@@ -267,10 +119,7 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
 
   execute: ->
     if @isLinewise() or @direction in ['right', 'left']
-      return super
-
-    @editor.transact =>
-      return if (count = @getCount()) is 0
+      return super @editor.transact => return if (count = @getCount()) is 0
       @withBlockwise =>
         if @direction is 'down'
           bottom = _.last(@editor.getSelectionsOrderedByBufferPosition())
@@ -392,9 +241,6 @@ class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
   direction: 'right'
 
 module.exports = {
-  MoveSelectedTextUp, MoveSelectedTextDown
-  MoveSelectedTextLeft, MoveSelectedTextRight
-
   DuplicateSelectedTextUp, DuplicateSelectedTextDown
   DuplicateSelectedTextLeft, DuplicateSelectedTextRight
 }
