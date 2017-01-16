@@ -9,6 +9,8 @@
   setBufferRangesForBlockwiseSelection
   insertBlankRowAtPoint
   includeBaseMixin
+  setBufferRangeForSelectionBy
+  replaceRangeAndSelect
 } = require './utils'
 
 Base = requireFrom('vim-mode-plus', 'base')
@@ -50,7 +52,6 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
           @vimState.activate('visual', 'characterwise')
 
   duplicateLinewise: (selection) ->
-    reversed = selection.isReversed()
     count = @getCount()
 
     [startRow, endRow ] = selection.getBufferRowRange()
@@ -83,8 +84,8 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
         else
           [end, end]
 
-    newRange = @editor.setTextInBufferRange(rangeToMutate, newText)
-    selection.setBufferRange(newRange, {reversed})
+    setBufferRangeForSelectionBy selection, =>
+      @editor.setTextInBufferRange(rangeToMutate, newText)
 
   duplicateBlockwise: (blockwiseSelection)  ->
     count = @getCount()
@@ -130,20 +131,15 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedText
 
   # No behavior diff by isOverwriteMode() and direction('left' or 'right')
   duplicateLinewise: (selection) ->
-    reversed = selection.isReversed()
-    count = @getCount()
-    [startRow, endRow ] = selection.getBufferRowRange()
-    newText = [startRow..endRow]
-      .map (row) => @editor.lineTextForBufferRow(row).repeat(count + 1)
-      .join("\n") + "\n"
-    newRange = selection.insertText(newText)
-    selection.setBufferRange(newRange, {reversed})
+    amount = @getCount() + 1
+    replaceRangeAndSelect selection, selection.getBufferRange(), {}, (text) ->
+      text.split("\n")
+        .map (rowText) -> rowText.repeat(amount)
+        .join("\n")
 
   duplicateCharacterwise: (selection) ->
     count = @getCount()
-    reversed = selection.isReversed()
     newText = selection.getText().repeat(count)
-
     width = newText.length
     {start, end} = selection.getBufferRange()
     rangeToMutate = switch @direction
@@ -158,8 +154,8 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedText
         else
           [end, end]
 
-    newRange = @editor.setTextInBufferRange(rangeToMutate, newText)
-    selection.setBufferRange(newRange, {reversed})
+    setBufferRangeForSelectionBy selection, =>
+      @editor.setTextInBufferRange(rangeToMutate, newText)
 
 class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
   direction: 'right'

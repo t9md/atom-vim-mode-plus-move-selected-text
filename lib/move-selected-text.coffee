@@ -7,6 +7,7 @@
   rotateChars
   rotateRows
   includeBaseMixin
+  replaceRangeAndSelect
 } = require './utils'
 
 Base = requireFrom('vim-mode-plus', 'base')
@@ -95,7 +96,6 @@ class MoveSelectedTextUp extends MoveSelectedText
     selection.setBufferRange(dstRange, {reversed})
 
   moveLinewise: (selection) ->
-    reversed = selection.isReversed()
     translation = switch @direction
       when 'up' then [[-1, 0], [0, 0]]
       when 'down' then [[0, 0], [1, 0]]
@@ -110,13 +110,12 @@ class MoveSelectedTextUp extends MoveSelectedText
       overwritten = @getOrInitOverwrittenForSelection selection, ->
         new Array(height).fill('')
 
-    selection.setBufferRange(rangeToMutate)
-    rows = selection.getText().replace(/\n$/, '').split("\n")
-    {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
-    @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-    newRange = selection.insertText(rows.join("\n") + "\n")
-    rangeToSelect = newRange.translate(translation.reverse()...)
-    selection.setBufferRange(rangeToSelect, {reversed})
+    translation.reverse()
+    replaceRangeAndSelect selection, rangeToMutate, {translation}, (text) =>
+      rows = text.replace(/\n$/, '').split("\n")
+      {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
+      @setOverwrittenForSelection(selection, overwritten) if overwritten.length
+      rows.join("\n") + "\n"
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
@@ -125,7 +124,6 @@ class MoveSelectedTextLeft extends MoveSelectedText
   direction: 'left'
 
   moveCharacterwise: (selection) ->
-    reversed = selection.isReversed()
     translation = switch @direction
       when 'right' then [[0, 0], [0, 1]]
       when 'left' then [[0, -1], [0, 0]]
@@ -139,13 +137,11 @@ class MoveSelectedTextLeft extends MoveSelectedText
       overwritten = @getOrInitOverwrittenForSelection selection, ->
         new Array(textLength).fill(' ')
 
-    selection.setBufferRange(rangeToMutate)
-    chars = selection.getText().split('')
-    {chars, overwritten} = rotateChars(chars, @direction, {overwritten})
-    @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-    newRange = selection.insertText(chars.join(""))
-    rangeToSelect = newRange.translate(translation.reverse()...)
-    selection.setBufferRange(rangeToSelect, {reversed})
+    translation.reverse()
+    replaceRangeAndSelect selection, rangeToMutate, {translation}, (text) =>
+      {chars, overwritten} = rotateChars(text.split(''), @direction, {overwritten})
+      @setOverwrittenForSelection(selection, overwritten) if overwritten.length
+      chars.join('')
 
   moveLinewise: (selection) ->
     switch @direction
