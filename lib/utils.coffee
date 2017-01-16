@@ -60,24 +60,32 @@ rotateRows = (selection, direction, {overwritten}={}) ->
   {newRange, overwritten}
 
 rotateChars = (selection, direction, {overwritten}={}) ->
+  # e.g.
+  # Assume situation where moving `pple` perfectly cover existing `lemon`
+  #  overwritten =   |1|2|3|4| <- this is hidden by chars `apple`
+  #  Text =        |Z|A|B|C|D|E|
+  #  Moving =        |A|B|C|D|   <- now moving |ABCD|(visually selected)
+  #  Chars(R) =      |A|B|C|D|E| <- Chars when moving 'Right' selected one char right
+  #  Chars(L) =    |Z|A|B|C|D|  <- Chars when moving 'Left', selected one char left
+  #
+  # - overwritten.length = 4
+  # - chars.length = 5(thus always 1 length longer than overwritten)
+  #
+  overwritten ?= []
   chars = selection.getText().split('')
   switch direction
     when 'right'
-      [other..., char] = chars
-      if overwritten?
-        chars = [overwritten.shift(), other...]
-        overwritten.push(char)
-      else
-        chars = [char, other...]
-        overwritten = []
+      # Move right-most(last in array) char to left-most(first in array)
+      # From: overwritten = 1234, chars = ABCDE
+      # To:   overwritten = 234E, chars = 1ABCD ('E' was hidden, '1' appeared)
+      overwritten.push(chars.pop()) # overwritten = 1234E, chars = ABCD
+      chars.unshift(overwritten.shift()) # overwritten = 234E, chars = 1ABCD
     when 'left'
-      [char, other...,] = chars
-      if overwritten?
-        chars = [other..., overwritten.pop()]
-        overwritten.unshift(char)
-      else
-        chars = [other..., char]
-        overwritten = []
+      # Move left-most(first in array) char to right-most(last in array)
+      # From: overwritten = 1234, chars = ZABCD
+      # To:   overwritten = Z123, chars = ABCD4 ('Z' was hidden, '4' appeared)
+      overwritten.unshift(chars.shift()) # overwritten = Z1234, chars = ABCD
+      chars.push(overwritten.pop()) # overwritten = Z123, chars = ABCD4
 
   newRange = selection.insertText(chars.join(""))
   {newRange, overwritten}
