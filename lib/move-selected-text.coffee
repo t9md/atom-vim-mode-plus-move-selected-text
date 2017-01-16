@@ -2,7 +2,6 @@ _ = require 'underscore-plus'
 
 {
   requireFrom
-  rotateArray
   insertTextAtPoint
   getBufferRangeForRowRange
   extendLastBufferRowToRow
@@ -25,16 +24,13 @@ StateManager = require './state-manager'
 stateManager = new StateManager()
 # Move
 # -------------------------
-class MoveOrDuplicateSelectedText extends Operator
+class MoveSelectedText extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
 
   isOverwriteMode: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')
-
-  execute: ->
-    console.log "still not implemented #{@getName()}"
 
   getWise: ->
     {submode} = @vimState
@@ -43,18 +39,12 @@ class MoveOrDuplicateSelectedText extends Operator
     else
       submode
 
-  withGroupChanges: (fn) ->
-    stateManager.resetIfNecessary(@editor)
-    @editor.transact(fn)
-    stateManager.groupChanges(@editor)
-
   getSelections: ->
     selections = @editor.getSelectionsOrderedByBufferPosition()
     if @direction is 'down'
       selections.reverse()
     selections
 
-class MoveSelectedText extends MoveOrDuplicateSelectedText
   hasOverwrittenForSelection: (selection) ->
     stateManager.get(@editor).overwrittenBySelection.has(selection)
 
@@ -80,6 +70,11 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
           selection.getBufferRange().start.column > 0
         else
           true
+
+  withGroupChanges: (fn) ->
+    stateManager.resetIfNecessary(@editor)
+    @editor.transact(fn)
+    stateManager.groupChanges(@editor)
 
   execute: ->
     wise = @getWise()
@@ -139,9 +134,11 @@ class MoveSelectedTextUp extends MoveSelectedText
         new Array(height).fill('')
 
     selection.setBufferRange(rangeToMutate)
-    {newRange, overwritten} = rotateRows(selection, @direction, {overwritten})
+    rows = selection.getText().replace(/\n$/, '').split("\n")
+    {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
     @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-    rangeToSelect = newRange.translate(translation.reverse()...)
+    newText = rows.join("\n") + "\n"
+    rangeToSelect = selection.insertText(newText).translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, {reversed})
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
@@ -166,9 +163,11 @@ class MoveSelectedTextLeft extends MoveSelectedText
         new Array(textLength).fill(' ')
 
     selection.setBufferRange(rangeToMutate)
-    {newRange, overwritten} = rotateChars(selection, @direction, {overwritten})
+    chars = selection.getText().split('')
+    {chars, overwritten} = rotateChars(chars, @direction, {overwritten})
+    newText = chars.join("")
     @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-    rangeToSelect = newRange.translate(translation.reverse()...)
+    rangeToSelect = selection.insertText(newText).translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, {reversed})
 
   moveLinewise: (selection) ->
@@ -181,94 +180,11 @@ class MoveSelectedTextLeft extends MoveSelectedText
 class MoveSelectedTextRight extends MoveSelectedTextLeft
   direction: 'right'
 
-# Duplicate
-# -------------------------
-class DuplicateSelectedText extends MoveOrDuplicateSelectedText
-
-class DuplicateSelectedTextUp extends DuplicateSelectedText
-  direction: 'up'
-  execute: ->
-    wise = @getWise()
-
-    if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
-      linewiseDisposable = switchToLinewise(@editor)
-
-    for selection in @getSelections()
-      if wise is 'linewise'
-        @duplicateLinewise(selection)
-      else
-        @duplicateCharacterwise(selection)
-
-    linewiseDisposable?.dispose()
-
-  duplicateLinewise: (selection) ->
-    reversed = selection.isReversed()
-    count = @getCount()
-    [startRow, endRow ] = selection.getBufferRowRange()
-    rows = [startRow..endRow].map (row) => @editor.lineTextForBufferRow(row)
-    height = rows.length * count
-    newText = (rows.join("\n") + "\n").repeat(count)
-
-    {start, end} = selection.getBufferRange()
-    if @direction is 'down' and end.isEqual(@editor.getEofBufferPosition())
-      end = ensureBufferEndWithNewLine(@editor)
-
-    if @isOverwriteMode()
-      rangeToMutate = switch @direction
-        when 'up' then [start.translate([-height, 0]), start]
-        when 'down' then [end, end.translate([+height, 0])]
-    else
-      rangeToMutate = switch @direction
-        when 'up' then [start, start]
-        when 'down' then [end, end]
-
-    newRange = @editor.setTextInBufferRange(rangeToMutate, newText)
-    selection.setBufferRange(newRange, {reversed})
-
-class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
-  direction: 'down'
-
-class DuplicateSelectedTextLeft extends DuplicateSelectedText
-  direction: 'left'
-  execute: ->
-    wise = @getWise()
-
-    if wise is 'linewise' and not @vimState.isMode('visual', 'linewise')
-      linewiseDisposable = switchToLinewise(@editor)
-
-    # @countTimes @getCount(), =>
-    for selection in @editor.getSelections()# when @canDuplicate(selection, wise)
-      if wise is 'linewise'
-        @duplicateLinewise(selection)
-      else
-        @duplicateCharacterwise(selection)
-
-    linewiseDisposable?.dispose()
-
-  # No behavior diff by isOverwriteMode() and direction('left' or 'right')
-  duplicateLinewise: (selection) ->
-    reversed = selection.isReversed()
-    count = @getCount()
-    [startRow, endRow ] = selection.getBufferRowRange()
-    newText = [startRow..endRow]
-      .map (row) => @editor.lineTextForBufferRow(row).repeat(count + 1)
-      .join("\n") + "\n"
-    newRange = selection.insertText(newText)
-    selection.setBufferRange(newRange, {reversed})
-
-class DuplicateSelectedTextRight extends DuplicateSelectedTextLeft
-  direction: 'right'
-
 commands = {
   MoveSelectedTextUp
   MoveSelectedTextDown
   MoveSelectedTextLeft
   MoveSelectedTextRight
-
-  DuplicateSelectedTextUp
-  DuplicateSelectedTextDown
-  DuplicateSelectedTextLeft
-  DuplicateSelectedTextRight
 }
 
 module.exports = {

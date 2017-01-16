@@ -34,7 +34,11 @@ module.exports =
 
   consumeVim: ({observeVimStates}) ->
     {commands, stateManager} = require("./move-selected-text")
+    
     for name, klass of commands
+      @subscriptions.add(klass.registerCommand())
+
+    for name, klass of require("./duplicate-selected-text")
       @subscriptions.add(klass.registerCommand())
 
     observeVimStates (vimState) ->

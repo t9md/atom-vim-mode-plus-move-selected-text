@@ -1,6 +1,6 @@
-{
-  getSelectedTexts
-} = require './utils'
+getSelectedTexts = (editor) ->
+  texts = (selection.getText() for selection in editor.getSelections())
+  texts.join("\n")
 
 class State
   selectedTexts: null
