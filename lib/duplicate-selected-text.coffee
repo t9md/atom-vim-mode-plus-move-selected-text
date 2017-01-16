@@ -1,6 +1,3 @@
-_ = require 'underscore-plus'
-{Range} = require 'atom'
-
 {
   requireFrom
   switchToLinewise
@@ -11,34 +8,17 @@ _ = require 'underscore-plus'
   repeatArray
   setBufferRangesForBlockwiseSelection
   insertBlankRowAtPoint
+  includeBaseMixin
 } = require './utils'
-
-{inspect} = require 'util'
-p = (args...) -> console.log inspect(args...)
 
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')
 
 class DuplicateSelectedText extends Operator
+  includeBaseMixin(this)
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
-
-  isOverwriteMode: ->
-    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
-
-  getWise: ->
-    {submode} = @vimState
-    if submode is 'characterwise' and @editor.getSelections().some(isMultiLineSelection)
-      'linewise'
-    else
-      submode
-
-  getSelections: ->
-    selections = @editor.getSelectionsOrderedByBufferPosition()
-    if @direction is 'down'
-      selections.reverse()
-    selections
 
   duplicateSelectionsLinewise: ->
     linewiseDisposable = switchToLinewise(@editor) unless @vimState.isMode('visual', 'linewise')

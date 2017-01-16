@@ -1,5 +1,3 @@
-_ = require 'underscore-plus'
-
 {
   requireFrom
   extendLastBufferRowToRow
@@ -8,10 +6,8 @@ _ = require 'underscore-plus'
   insertSpacesToPoint
   rotateChars
   rotateRows
+  includeBaseMixin
 } = require './utils'
-
-{inspect} = require 'util'
-p = (args...) -> console.log inspect(args...)
 
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')
@@ -20,25 +16,10 @@ StateManager = require './state-manager'
 stateManager = new StateManager()
 
 class MoveSelectedText extends Operator
+  includeBaseMixin(this)
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
   flashTarget: false
-
-  isOverwriteMode: ->
-    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
-
-  getWise: ->
-    {submode} = @vimState
-    if submode is 'characterwise' and @editor.getSelections().some(isMultiLineSelection)
-      'linewise'
-    else
-      submode
-
-  getSelections: ->
-    selections = @editor.getSelectionsOrderedByBufferPosition()
-    if @direction is 'down'
-      selections.reverse()
-    selections
 
   hasOverwrittenForSelection: (selection) ->
     stateManager.get(@editor).overwrittenBySelection.has(selection)
