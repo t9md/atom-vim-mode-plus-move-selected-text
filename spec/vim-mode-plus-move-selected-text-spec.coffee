@@ -504,7 +504,7 @@ describe "vim-mode-plus-move-selected-text", ->
             oxYZ@
             """
 
-  xdescribe "duplicate up/down", ->
+  describe "duplicate up/down", ->
     beforeEach ->
       set
         textC: """
@@ -757,7 +757,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[1, 1], [1, 3]]
               [[2, 1], [2, 3]]
             ]
-        xit "duplicate charwise up", ->
+        it "duplicate charwise up", ->
           set
             textC: """
             o|ooo
@@ -820,7 +820,7 @@ describe "vim-mode-plus-move-selected-text", ->
             2 very long |_2 very long |_2 very long |_
 
             """
-      xdescribe "overwrite: true", ->
+      describe "overwrite: true", ->
         beforeEach ->
           setOverwriteConfig(true)
 
@@ -842,16 +842,16 @@ describe "vim-mode-plus-move-selected-text", ->
             2 very long |_2 very long |_2 very long |_
 
             """
-        it "duplicate linewise left do nothing", ->
+        xit "duplicate linewise left do nothing", ->
           ensure 'V j j cmd-H',
             selectedBufferRange: rowRange(0, 2)
             text: originalText
-        it "duplicate linewise left with count do nothing", ->
+        xit "duplicate linewise left with count do nothing", ->
           ensure 'V j j 2 cmd-H',
             selectedBufferRange: rowRange(0, 2)
             text: originalText
 
-    xdescribe "characterwise", ->
+    describe "characterwise", ->
       describe "overwrite: false", ->
         beforeEach ->
           set

@@ -71,20 +71,20 @@ class MoveSelectedText extends Operator
     @editor.transact(fn)
     stateManager.groupChanges(@editor)
 
-  execute: ->
+  moveSelections: (fn) ->
     wise = @getWise()
+    @countTimes @getCount(), =>
+      for selection in @getSelections() when @canMove(selection, wise)
+        fn(selection)
 
+  execute: ->
     @withGroupChanges =>
-      if (@direction in ['up', 'down']) and (wise is 'linewise') and not @vimState.isMode('visual', 'linewise')
-        linewiseDisposable = switchToLinewise(@editor)
-
-      @countTimes @getCount(), =>
-        for selection in @getSelections() when @canMove(selection, wise)
-          if wise is 'linewise'
-            @moveLinewise(selection)
-          else
-            @moveCharacterwise(selection)
-      linewiseDisposable?.dispose()
+      if @getWise() is 'linewise'
+        linewiseDisposable = switchToLinewise(@editor) unless @vimState.isMode('visual', 'linewise')
+        @moveSelections(@moveLinewise.bind(this))
+        linewiseDisposable?.dispose()
+      else
+        @moveSelections(@moveCharacterwise.bind(this))
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
