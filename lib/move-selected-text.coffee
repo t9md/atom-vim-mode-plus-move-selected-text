@@ -95,9 +95,7 @@ class MoveSelectedTextUp extends MoveSelectedText
 
   moveCharacterwise: (selection) ->
     # Swap srcRange with dstRange(the characterwise block one line above of current block)
-    reversed = selection.isReversed()
     srcRange = selection.getBufferRange()
-
     dstRange = switch @direction
       when 'up' then srcRange.translate([-1, 0])
       when 'down' then srcRange.translate([+1, 0])
@@ -115,7 +113,7 @@ class MoveSelectedTextUp extends MoveSelectedText
 
     @editor.setTextInBufferRange(srcRange, dstText)
     @editor.setTextInBufferRange(dstRange, srcText)
-    selection.setBufferRange(dstRange, {reversed})
+    selection.setBufferRange(dstRange, reversed: selection.isReversed())
 
   moveLinewise: (selection) ->
     translation = switch @direction
@@ -132,14 +130,14 @@ class MoveSelectedTextUp extends MoveSelectedText
       overwritten = @getOrInitOverwrittenForSelection selection, ->
         new Array(height).fill('')
 
-    translation.reverse()
     newRange = replaceBufferRangeBy @editor, rangeToMutate, (text) =>
       rows = text.replace(/\n$/, '').split("\n")
       {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
       @setOverwrittenForSelection(selection, overwritten) if overwritten.length
       rows.join("\n") + "\n"
 
-    selection.setBufferRange(newRange.translate(translation...), reversed: selection.isReversed())
+    rangeToSelect = newRange.translate(translation.reverse()...)
+    selection.setBufferRange(rangeToSelect, reversed: selection.isReversed())
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
@@ -161,12 +159,12 @@ class MoveSelectedTextLeft extends MoveSelectedText
       overwritten = @getOrInitOverwrittenForSelection selection, ->
         new Array(textLength).fill(' ')
 
-    translation.reverse()
     newRange = replaceBufferRangeBy @editor, rangeToMutate, (text) =>
       {chars, overwritten} = rotateChars(text.split(''), @direction, {overwritten})
       @setOverwrittenForSelection(selection, overwritten) if overwritten.length
       chars.join('')
-    selection.setBufferRange(newRange.translate(translation...), reversed: selection.isReversed())
+    rangeToSelect = newRange.translate(translation.reverse()...)
+    selection.setBufferRange(rangeToSelect, reversed: selection.isReversed())
 
   moveLinewise: (selection) ->
     switch @direction

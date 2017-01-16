@@ -89,7 +89,7 @@ repeatArray = (array, amount) ->
 setBufferRangesForBlockwiseSelection = (blockwiseSelection, ranges) ->
   head = blockwiseSelection.getHeadSelection()
   wasReversed = blockwiseSelection.isReversed()
-  blockwiseSelection.setSelectedBufferRanges(ranges, {reversed: head.isReversed()})
+  blockwiseSelection.setSelectedBufferRanges(ranges, reversed: head.isReversed())
   blockwiseSelection.reverse() if wasReversed
 
 insertBlankRowAtPoint = (editor, point, count) ->
