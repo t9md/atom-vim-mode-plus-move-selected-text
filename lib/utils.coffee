@@ -100,27 +100,6 @@ replaceBufferRangeBy = (editor, range, fn) ->
   oldText = editor.getTextInBufferRange(range)
   editor.setTextInBufferRange(range, fn(oldText))
 
-baseMixin =
-  isOverwriteMode: ->
-    atom.config.get('vim-mode-plus-move-selected-text.overwrite')
-
-  getWise: ->
-    {submode} = @vimState
-    if submode is 'characterwise' and @editor.getSelections().some(isMultiLineSelection)
-      'linewise'
-    else
-      submode
-
-  getSelections: ->
-    selections = @editor.getSelectionsOrderedByBufferPosition()
-    if @direction is 'down'
-      selections.reverse()
-    selections
-
-includeBaseMixin = (klass) ->
-  for key, value of baseMixin
-    klass::[key] = value
-
 module.exports = {
   requireFrom
   isMultiLineSelection
@@ -134,6 +113,5 @@ module.exports = {
   repeatArray
   setBufferRangesForBlockwiseSelection
   insertBlankRowAtPoint
-  includeBaseMixin
   replaceBufferRangeBy
 }
