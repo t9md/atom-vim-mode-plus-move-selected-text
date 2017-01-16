@@ -100,6 +100,10 @@ replaceBufferRangeBy = (editor, range, fn) ->
   oldText = editor.getTextInBufferRange(range)
   editor.setTextInBufferRange(range, fn(oldText))
 
+rowCountForSelection = (selection) ->
+  [startRow, endRow ] = selection.getBufferRowRange()
+  endRow - startRow + 1
+
 module.exports = {
   requireFrom
   isMultiLineSelection
@@ -114,4 +118,5 @@ module.exports = {
   setBufferRangesForBlockwiseSelection
   insertBlankRowAtPoint
   replaceBufferRangeBy
+  rowCountForSelection
 }

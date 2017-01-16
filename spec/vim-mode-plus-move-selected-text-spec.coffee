@@ -842,14 +842,6 @@ describe "vim-mode-plus-move-selected-text", ->
             2 very long |_2 very long |_2 very long |_
 
             """
-        xit "duplicate linewise left do nothing", ->
-          ensure 'V j j cmd-H',
-            selectedBufferRange: rowRange(0, 2)
-            text: originalText
-        xit "duplicate linewise left with count do nothing", ->
-          ensure 'V j j 2 cmd-H',
-            selectedBufferRange: rowRange(0, 2)
-            text: originalText
 
     describe "characterwise", ->
       describe "overwrite: false", ->

@@ -1,7 +1,6 @@
 {
   ensureBufferEndWithNewLine
   extendLastBufferRowToRow
-  includeBaseMixin
   insertBlankRowAtPoint
   insertSpacesToPoint
   isMultiLineSelection
@@ -12,6 +11,7 @@
   rotateRows
   setBufferRangesForBlockwiseSelection
   switchToLinewise
+  rowCountForSelection
 } = require './utils'
 
 Base = requireFrom('vim-mode-plus', 'base')
@@ -58,17 +58,13 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
       @setOverwrittenForSelection(selection, initializer())
     @getOverwrittenForSelection(selection)
 
-  canMove: (selection, wise) ->
-    switch @direction
-      when 'up'
-        selection.getBufferRange().start.row > 0
-      when 'down', 'right'
-        true
-      when 'left'
-        if wise in ['characterwise', 'blockwise']
-          selection.getBufferRange().start.column > 0
-        else
-          true
+  getCount: ->
+    count = super
+    if @direction is 'up'
+      startRow = @editor.getSelectionsOrderedByBufferPosition()[0].getBufferRowRange()[0]
+      Math.min(count, startRow)
+    else
+      count
 
   withGroupChanges: (fn) ->
     stateManager.resetIfNecessary(@editor)
@@ -76,9 +72,8 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
     stateManager.groupChanges(@editor)
 
   moveSelections: (fn) ->
-    wise = @getWise()
     @countTimes @getCount(), =>
-      for selection in @getSelections() when @canMove(selection, wise)
+      for selection in @getSelections()
         fn(selection)
 
   execute: ->
@@ -146,6 +141,9 @@ class MoveSelectedTextLeft extends MoveSelectedText
   direction: 'left'
 
   moveCharacterwise: (selection) ->
+    if @direction is 'left' and selection.getBufferRange().start.column is 0
+      return
+
     translation = switch @direction
       when 'right' then [[0, 0], [0, 1]]
       when 'left' then [[0, -1], [0, 0]]
@@ -208,21 +206,22 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
         if wasCharacterwise and @vimState.getBlockwiseSelections().every(isOneHeight)
           @vimState.activate('visual', 'characterwise')
 
-  duplicateLinewise: (selection) ->
+  getCountForSelection: (selectionOrBlockwiseSelection) ->
     count = @getCount()
-
-    [startRow, endRow ] = selection.getBufferRowRange()
-    rows = [startRow..endRow]
-
     if @isOverwriteMode() and @direction is 'up'
-      # Adjust count to avoid partial duplicate.
-      countMax = Math.floor(startRow / rows.length)
-      count = Math.min(countMax, count)
-      return if count is 0
+      startRow = selectionOrBlockwiseSelection.getBufferRowRange()[0]
+      countMax = Math.floor(startRow / rowCountForSelection(selectionOrBlockwiseSelection))
+      Math.min(countMax, count)
+    else
+      count
 
-    height = rows.length * count
-    rowsText = rows.map((row) => @editor.lineTextForBufferRow(row))
-    newText = (rowsText.join("\n") + "\n").repeat(count)
+  duplicateLinewise: (selection) ->
+    return unless count = @getCountForSelection(selection)
+
+    selectedText = selection.getText()
+    selectedText += "\n" unless selectedText.endsWith("\n")
+    newText = selectedText.repeat(count)
+    height = rowCountForSelection(selection) * count
 
     {start, end} = selection.getBufferRange()
     if @direction is 'down'
@@ -245,9 +244,10 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
     selection.setBufferRange(newRange, reversed: selection.isReversed())
 
   duplicateBlockwise: (blockwiseSelection)  ->
-    count = @getCount()
-    height = blockwiseSelection.getHeight() * count
+    return unless count = @getCountForSelection(blockwiseSelection)
+
     [startRow, endRow] = blockwiseSelection.getBufferRowRange()
+    height = blockwiseSelection.getHeight() * count
     switch @direction
       when 'up'
         if @isOverwriteMode()
@@ -294,8 +294,19 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedText
       .join("\n")
     selection.insertText(newText, select: true)
 
-  duplicateCharacterwise: (selection) ->
+  # Return adjusted count to avoid partial duplicate in overwrite-mode
+  getCountForSelection: (selection) ->
     count = @getCount()
+    if @isOverwriteMode() and @direction is 'left'
+      {start} = selection.getBufferRange()
+      countMax = Math.floor(start.column / selection.getText().length)
+      Math.min(countMax, count)
+    else
+      count
+
+  duplicateCharacterwise: (selection) ->
+    return unless count = @getCountForSelection(selection)
+
     newText = selection.getText().repeat(count)
     width = newText.length
     {start, end} = selection.getBufferRange()
