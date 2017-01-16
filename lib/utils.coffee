@@ -11,11 +11,6 @@ swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
 insertTextAtPoint = (editor, point, text) ->
   editor.setTextInBufferRange([point, point], text)
 
-getBufferRangeForRowRange = (editor, rowRange) ->
-  [startRange, endRange] = rowRange.map (row) ->
-    editor.bufferRangeForBufferRow(row, includeNewline: true)
-  startRange.union(endRange)
-
 # Return new EOF
 ensureBufferEndWithNewLine = (editor) ->
   eof = editor.getEofBufferPosition()
@@ -86,11 +81,9 @@ switchToLinewise = (editor) ->
 
 module.exports = {
   requireFrom
-  getBufferRangeForRowRange
   isMultiLineSelection
   rotateChars
   rotateRows
-
   insertTextAtPoint
   insertSpacesToPoint
   extendLastBufferRowToRow

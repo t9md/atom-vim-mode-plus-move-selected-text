@@ -2,28 +2,23 @@ _ = require 'underscore-plus'
 
 {
   requireFrom
-  insertTextAtPoint
-  getBufferRangeForRowRange
   extendLastBufferRowToRow
   switchToLinewise
   isMultiLineSelection
   insertSpacesToPoint
   rotateChars
   rotateRows
-  ensureBufferEndWithNewLine
 } = require './utils'
-swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
-{Range} = require 'atom'
 
 {inspect} = require 'util'
 p = (args...) -> console.log inspect(args...)
+
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')
 
 StateManager = require './state-manager'
 stateManager = new StateManager()
-# Move
-# -------------------------
+
 class MoveSelectedText extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
@@ -95,6 +90,7 @@ class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
 
   moveCharacterwise: (selection) ->
+    # Swap srcRange with dstRange(the characterwise block one line above of current block)
     reversed = selection.isReversed()
     srcRange = selection.getBufferRange()
 
@@ -137,8 +133,8 @@ class MoveSelectedTextUp extends MoveSelectedText
     rows = selection.getText().replace(/\n$/, '').split("\n")
     {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
     @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-    newText = rows.join("\n") + "\n"
-    rangeToSelect = selection.insertText(newText).translate(translation.reverse()...)
+    newRange = selection.insertText(rows.join("\n") + "\n")
+    rangeToSelect = newRange.translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, {reversed})
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
@@ -165,9 +161,9 @@ class MoveSelectedTextLeft extends MoveSelectedText
     selection.setBufferRange(rangeToMutate)
     chars = selection.getText().split('')
     {chars, overwritten} = rotateChars(chars, @direction, {overwritten})
-    newText = chars.join("")
     @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-    rangeToSelect = selection.insertText(newText).translate(translation.reverse()...)
+    newRange = selection.insertText(chars.join(""))
+    rangeToSelect = newRange.translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, {reversed})
 
   moveLinewise: (selection) ->
@@ -180,13 +176,12 @@ class MoveSelectedTextLeft extends MoveSelectedText
 class MoveSelectedTextRight extends MoveSelectedTextLeft
   direction: 'right'
 
-commands = {
-  MoveSelectedTextUp
-  MoveSelectedTextDown
-  MoveSelectedTextLeft
-  MoveSelectedTextRight
-}
-
 module.exports = {
-  stateManager, commands
+  stateManager: stateManager
+  commands: {
+    MoveSelectedTextUp
+    MoveSelectedTextDown
+    MoveSelectedTextLeft
+    MoveSelectedTextRight
+  }
 }

@@ -6,16 +6,13 @@ _ = require 'underscore-plus'
   isMultiLineSelection
   ensureBufferEndWithNewLine
 } = require './utils'
-swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
-{Range} = require 'atom'
 
 {inspect} = require 'util'
 p = (args...) -> console.log inspect(args...)
+
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')
 
-# Duplicate
-# -------------------------
 class DuplicateSelectedText extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
