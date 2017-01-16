@@ -1,9 +1,3 @@
-Base = requireFrom('vim-mode-plus', 'base')
-Operator = Base.getClass('Operator')
-
-StateManager = require './state-manager'
-stateManager = new StateManager()
-
 {
   ensureBufferEndWithNewLine
   extendLastBufferRowToRow
@@ -19,6 +13,12 @@ stateManager = new StateManager()
   setBufferRangesForBlockwiseSelection
   switchToLinewise
 } = require './utils'
+
+Base = requireFrom('vim-mode-plus', 'base')
+Operator = Base.getClass('Operator')
+
+StateManager = require './state-manager'
+stateManager = new StateManager()
 
 class MoveOrDuplicateSelectedText extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
