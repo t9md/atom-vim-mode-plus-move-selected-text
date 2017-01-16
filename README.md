@@ -5,27 +5,17 @@
 Move selected text like object.  
 
 This is operator plugin for [vim-mode-plus](https://atom.io/packages/vim-mode-plus).  
-Always require [vim-mode-plus](https://atom.io/packages/vim-mode-plus) **latest** vim-mode-plus.
+Require **latest** [vim-mode-plus](https://atom.io/packages/vim-mode-plus).
 
 - Works only in visual mode.  
-- Support all submode(linewise, characterwise, blockwise).
-- Can revert consecutive movement with single undo.
+- Support all submode(`linewise`, `characterwise`, `blockwise`).
+- Can revert consecutive movement by single undo.
 - Can switch `overwrite` mode via `vim-mode-plus-user:toggle-overwrite` command.  
 - Green cursor color indicate your are now in `overwrite` mode.
 
 This package is feature migration from my [vim-textmanip](https://github.com/t9md/vim-textmanip) plugin for pure Vim.  
 
 ![](https://raw.githubusercontent.com/t9md/t9md/d44c35f193478c0ccf996d0b3085d276fe9ea4b9/img/vim-mode-plus/move-selected-text.gif)
-
-## TODO
-
-- [ ] Write spec
-- [ ] Work as screenPosition wise for characterwise move to support soft-wrapped buffer.
-- [x] Duplicate above/below with overwrite mode support
-- [x] blockwise support
-- [x] Support count
-- [x] Concatenate undo history to revert continuous movement with one undo
-- [x] Support overwrite movement
 
 ## keymap example
 

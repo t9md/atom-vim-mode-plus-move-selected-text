@@ -1,3 +1,6 @@
+## 0.8.0
+- Internal: Rewrote from scratch for maintainability. Fix corner case bug.
+
 ## 0.7.0
 - Fix: Still not perfect but now works in latest vim-mode-plus(v0.80.0).
 

@@ -19,18 +19,6 @@ setOverwriteConfig = (value) ->
 
 {getVimState, TextData, dispatch} = requireFrom 'vim-mode-plus', 'spec/spec-helper'
 
-# Should cover
-# Move(auto-extend EOF, cout support)
-#  linewise ^,v,<,>
-#  charwise ^,v,<,>
-
-# Duplicate(auto-extend EOF, cout support)
-#  linewise ^,v,<,>
-#  charwise ^,v,<,>
-# toggle-overwrite command
-#  change css selector
-#  change config value change css since observed
-
 describe "vim-mode-plus-move-selected-text", ->
   [set, ensure, keystroke, editor, editorElement, vimState] = []
 
