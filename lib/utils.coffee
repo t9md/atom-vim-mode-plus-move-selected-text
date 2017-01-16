@@ -79,6 +79,22 @@ switchToLinewise = (editor) ->
     swrap.normalize(editor)
     swrap.applyWise(editor, 'characterwise')
 
+# e.g.
+#  repeatArray([1, 2, 3], 3) => [ 1, 2, 3, 1, 2, 3, 1, 2, 3 ]
+repeatArray = (array, amount) ->
+  [1..amount]
+    .map -> array
+    .reduce (a, b) -> a.concat(b)
+
+setBufferRangesForBlockwiseSelection = (blockwiseSelection, ranges) ->
+  head = blockwiseSelection.getHeadSelection()
+  wasReversed = blockwiseSelection.isReversed()
+  blockwiseSelection.setSelectedBufferRanges(ranges, {reversed: head.isReversed()})
+  blockwiseSelection.reverse() if wasReversed
+
+insertBlankRowAtPoint = (editor, point, count) ->
+  insertTextAtPoint(editor, point, "\n".repeat(count))
+
 module.exports = {
   requireFrom
   isMultiLineSelection
@@ -89,4 +105,7 @@ module.exports = {
   extendLastBufferRowToRow
   ensureBufferEndWithNewLine
   switchToLinewise
+  repeatArray
+  setBufferRangesForBlockwiseSelection
+  insertBlankRowAtPoint
 }

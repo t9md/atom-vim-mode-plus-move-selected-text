@@ -8,6 +8,9 @@ _ = require 'underscore-plus'
   ensureBufferEndWithNewLine
   extendLastBufferRowToRow
   insertSpacesToPoint
+  repeatArray
+  setBufferRangesForBlockwiseSelection
+  insertBlankRowAtPoint
 } = require './utils'
 
 {inspect} = require 'util'
@@ -105,39 +108,32 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
 
   duplicateBlockwise: (blockwiseSelection)  ->
     count = @getCount()
-    insertBlankLine = (amount) =>
-      [startRow, endRow] = blockwiseSelection.getBufferRowRange()
-      if @isOverwriteMode()
-        if @direction is 'down'
-          extendLastBufferRowToRow(@editor, endRow + amount)
-      else
-        point = switch @direction
-          when 'up' then [startRow - 1, Infinity]
-          when 'down' then [endRow + 1, 0]
-        @editor.setTextInBufferRange([point, point], "\n".repeat(amount))
-
-    getRangeToInsert = (selection, count) =>
-      selection.getBufferRange().translate(
-        switch @direction
-          when 'up' then [-height * count, 0]
-          when 'down' then [+height * count, 0]
-        )
-
-    height = blockwiseSelection.getHeight()
-    insertBlankLine(height * count)
+    height = blockwiseSelection.getHeight() * count
+    [startRow, endRow] = blockwiseSelection.getBufferRowRange()
+    switch @direction
+      when 'up'
+        if @isOverwriteMode()
+          insertStartRow = startRow - height
+        else
+          insertBlankRowAtPoint(@editor, [startRow, 0], height)
+          insertStartRow = startRow
+      when 'down'
+        if @isOverwriteMode()
+          extendLastBufferRowToRow(@editor, endRow + height)
+        else
+          insertBlankRowAtPoint(@editor, [endRow + 1, 0], height)
+        insertStartRow = endRow + 1
 
     newRanges = []
-    @countTimes @getCount(), ({count}) =>
-      for selection, i in blockwiseSelection.selections
-        text = selection.getText()
-        range = getRangeToInsert(selection, count)
-        insertSpacesToPoint(@editor, range.start)
-        newRanges.push @editor.setTextInBufferRange(range, text)
+    selectionsOrderd = blockwiseSelection.selections.sort (a, b) -> a.compare(b)
+    for selection in repeatArray(selectionsOrderd, count)
+      {start, end} = selection.getBufferRange()
+      start.row = end.row = insertStartRow
+      insertStartRow++
+      insertSpacesToPoint(@editor, start)
+      newRanges.push(@editor.setTextInBufferRange([start, end], selection.getText()))
 
-    head = blockwiseSelection.getHeadSelection()
-    wasReversed = blockwiseSelection.isReversed()
-    blockwiseSelection.setSelectedBufferRanges(newRanges, {reversed: head.isReversed()})
-    blockwiseSelection.reverse() if wasReversed
+    setBufferRangesForBlockwiseSelection(blockwiseSelection, newRanges)
 
 class DuplicateSelectedTextDown extends DuplicateSelectedTextUp
   direction: 'down'
