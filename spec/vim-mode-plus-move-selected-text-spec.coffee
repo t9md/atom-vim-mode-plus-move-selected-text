@@ -1092,3 +1092,37 @@ describe "vim-mode-plus-move-selected-text", ->
         ensure "escape u",
           mode: 'normal',
           text: originalText
+
+      it "clear overwritten state and undo grouping on mode shift", ->
+        set cursor: [2, 6]
+        ensureMove = getEnsureWithOptions({mode: ['visual', 'blockwise'], selectedTextOrdered})
+        ensureMove "ctrl-v 3 j 9 l",
+          text: originalText
+
+        ensureMove "down 2 right", text: """
+          01234567890123456789012
+          90123456789012345678901
+          890123          4567890
+          789012  +--------+56789
+          678901  |ABCDEFGH|45678
+          567890  |IJKLMNOP|34567
+          45678901+--------+23456
+          01234567890123456789012
+          """
+        textGrouped = editor.getText()
+
+        ensure "escape", mode: 'normal'
+        ensureMove "g v", text: textGrouped
+        ensureMove "2 up", text: """
+          01234567890123456789012
+          90123456+--------+78901
+          890123  |ABCDEFGH|67890
+          789012  |IJKLMNOP|56789
+          678901  +--------+45678
+          567890            34567
+          45678901          23456
+          01234567890123456789012
+          """
+        ensure "escape", mode: 'normal'
+        ensure "u", mode: 'normal', text: textGrouped
+        ensure "u", mode: 'normal', text: originalText
