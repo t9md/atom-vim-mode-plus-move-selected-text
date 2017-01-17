@@ -23,7 +23,6 @@ stateManager = new StateManager()
 class MoveOrDuplicateSelectedText extends Operator
   @commandScope: 'atom-text-editor.vim-mode-plus.visual-mode'
   @commandPrefix: 'vim-mode-plus-user'
-  flashTarget: false
 
   isOverwriteMode: ->
     atom.config.get('vim-mode-plus-move-selected-text.overwrite')

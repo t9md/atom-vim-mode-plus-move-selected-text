@@ -36,18 +36,19 @@ describe "vim-mode-plus-move-selected-text", ->
       {editor, editorElement} = state
       {set, ensure, keystroke} = vim
 
-    atom.keymaps.add "test",
+    keymaps =
       'atom-text-editor.vim-mode-plus.visual-mode':
-        'ctrl-t': 'vim-mode-plus-user:toggle-overwrite'
-        'ctrl-k': 'vim-mode-plus-user:move-selected-text-up'
-        'ctrl-j': 'vim-mode-plus-user:move-selected-text-down'
-        'ctrl-h': 'vim-mode-plus-user:move-selected-text-left'
-        'ctrl-l': 'vim-mode-plus-user:move-selected-text-right'
+        'up': 'vim-mode-plus-user:move-selected-text-up'
+        'down': 'vim-mode-plus-user:move-selected-text-down'
+        'left': 'vim-mode-plus-user:move-selected-text-left'
+        'right': 'vim-mode-plus-user:move-selected-text-right'
 
         'cmd-K': 'vim-mode-plus-user:duplicate-selected-text-up'
         'cmd-J': 'vim-mode-plus-user:duplicate-selected-text-down'
         'cmd-H': 'vim-mode-plus-user:duplicate-selected-text-left'
         'cmd-L': 'vim-mode-plus-user:duplicate-selected-text-right'
+    keymapsPriority = 1
+    atom.keymaps.add "test", keymaps, keymapsPriority
 
     waitsForPromise ->
       atom.packages.activatePackage('vim-mode-plus-move-selected-text')
@@ -130,34 +131,34 @@ describe "vim-mode-plus-move-selected-text", ->
         it "[case-1] one line", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\n", selectionIsReversed: false)
           ensureMove 'V', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "line1\nline0\nline2\n" # down
-          ensureMove 'ctrl-j', text: "line1\nline2\nline0\n" # down
-          ensureMove 'ctrl-k', text: "line1\nline0\nline2\n" # up
-          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n" # up
+          ensureMove 'down', text: "line1\nline0\nline2\n" # down
+          ensureMove 'down', text: "line1\nline2\nline0\n" # down
+          ensureMove 'up', text: "line1\nline0\nline2\n" # up
+          ensureMove 'up', text: "line0\nline1\nline2\n" # up
         it "[case-2] two line", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "line2\nline0\nline1\n"
-          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+          ensureMove 'down', text: "line2\nline0\nline1\n"
+          ensureMove 'up', text: "line0\nline1\nline2\n"
         it "[case-3] two line, selection is reversed: keep reversed state", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: true)
           set cursor: [1, 0]
           ensureMove 'V k', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "line2\nline0\nline1\n"
-          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+          ensureMove 'down', text: "line2\nline0\nline1\n"
+          ensureMove 'up', text: "line0\nline1\nline2\n"
         it "extends final row when move down", ->
           ensureMove = getEnsureWithOptions(selectedText: "line2\n", selectionIsReversed: false)
           set cursor: [2, 0]
           ensureMove 'V', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "line0\nline1\n\nline2\n"
-          ensureMove 'ctrl-j', text: "line0\nline1\n\n\nline2\n"
+          ensureMove 'down', text: "line0\nline1\n\nline2\n"
+          ensureMove 'down', text: "line0\nline1\n\n\nline2\n"
         it "support count", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
-          ensureMove '2 ctrl-j', text: "line2\n\nline0\nline1\n"
-          ensureMove '2 ctrl-k', text: "line0\nline1\nline2\n\n"
-          ensureMove '1 0 ctrl-j', text: "line2\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
-          ensureMove '5 ctrl-k', text: "line2\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
+          ensureMove '2 down', text: "line2\n\nline0\nline1\n"
+          ensureMove '2 up', text: "line0\nline1\nline2\n\n"
+          ensureMove '1 0 down', text: "line2\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
+          ensureMove '5 up', text: "line2\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
 
       describe "overwrite: true", ->
         beforeEach ->
@@ -171,34 +172,34 @@ describe "vim-mode-plus-move-selected-text", ->
         it "[case-1] one line", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\n", selectionIsReversed: false)
           ensureMove 'V', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "\nline0\nline2\n"
-          ensureMove 'ctrl-j', text: "\nline1\nline0\n"
-          ensureMove 'ctrl-k', text: "\nline0\nline2\n"
-          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+          ensureMove 'down', text: "\nline0\nline2\n"
+          ensureMove 'down', text: "\nline1\nline0\n"
+          ensureMove 'up', text: "\nline0\nline2\n"
+          ensureMove 'up', text: "line0\nline1\nline2\n"
         it "[case-2] two line", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "\nline0\nline1\n"
-          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+          ensureMove 'down', text: "\nline0\nline1\n"
+          ensureMove 'up', text: "line0\nline1\nline2\n"
         it "[case-3] two line, selection is reversed: keep reversed state", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: true)
           set cursor: [1, 0]
           ensureMove 'V k', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "\nline0\nline1\n"
-          ensureMove 'ctrl-k', text: "line0\nline1\nline2\n"
+          ensureMove 'down', text: "\nline0\nline1\n"
+          ensureMove 'up', text: "line0\nline1\nline2\n"
         it "extends final row when move down", ->
           ensureMove = getEnsureWithOptions(selectedText: "line2\n", selectionIsReversed: false)
           set cursor: [2, 0]
           ensureMove 'V', text: "line0\nline1\nline2\n"
-          ensureMove 'ctrl-j', text: "line0\nline1\n\nline2\n"
-          ensureMove 'ctrl-j', text: "line0\nline1\n\n\nline2\n"
+          ensureMove 'down', text: "line0\nline1\n\nline2\n"
+          ensureMove 'down', text: "line0\nline1\n\n\nline2\n"
         it "support count", ->
           ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
-          ensureMove '2 ctrl-j', text: "\n\nline0\nline1\n"
-          ensureMove '2 ctrl-j', text: "\n\nline2\n\nline0\nline1\n"
-          ensureMove '1 0 ctrl-j', text: "\n\nline2\n\n\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
-          ensureMove '5 ctrl-k', text: "\n\nline2\n\n\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
+          ensureMove '2 down', text: "\n\nline0\nline1\n"
+          ensureMove '2 down', text: "\n\nline2\n\nline0\nline1\n"
+          ensureMove '1 0 down', text: "\n\nline2\n\n\n\n\n\n\n\n\n\n\n\nline0\nline1\n"
+          ensureMove '5 up', text: "\n\nline2\n\n\n\n\n\n\nline0\nline1\n\n\n\n\n\n"
 
     describe "characterwise", ->
       describe "overwrite: false", ->
@@ -220,14 +221,14 @@ describe "vim-mode-plus-move-selected-text", ->
             YYY
             ZZZ\n
             """
-          ensureMove 'ctrl-j',
+          ensureMove 'down',
             text: """
             oxx
             xoo
             YZZ
             ZYY\n
             """
-          ensureMove 'ctrl-j',
+          ensureMove 'down',
             text_: """
             oxx
             xZZ
@@ -235,7 +236,7 @@ describe "vim-mode-plus-move-selected-text", ->
             Z__
             _YY
             """
-          ensureMove '2 ctrl-j',
+          ensureMove '2 down',
             text_: """
             oxx
             xZZ
@@ -245,7 +246,7 @@ describe "vim-mode-plus-move-selected-text", ->
             ___
             _YY
             """
-          ensureMove '4 ctrl-k',
+          ensureMove '4 up',
             text_: """
             ooo
             xxx
@@ -276,14 +277,14 @@ describe "vim-mode-plus-move-selected-text", ->
             YYY
             ZZZ\n
             """
-          ensureMove 'ctrl-j',
+          ensureMove 'down',
             text_: """
             o__
             xoo
             Y__
             ZYY\n
             """
-          ensureMove 'ctrl-j',
+          ensureMove 'down',
             text_: """
             o__
             xxx
@@ -291,7 +292,7 @@ describe "vim-mode-plus-move-selected-text", ->
             ZZZ
             _YY
             """
-          ensureMove '2 ctrl-j',
+          ensureMove '2 down',
             text_: """
             o__
             xxx
@@ -301,7 +302,7 @@ describe "vim-mode-plus-move-selected-text", ->
             ___
             _YY
             """
-          ensureMove '4 ctrl-k',
+          ensureMove '4 up',
             text_: """
             ooo
             xxx
@@ -331,16 +332,16 @@ describe "vim-mode-plus-move-selected-text", ->
           ensureMove "V j",
             text_: "line0\n__line1\n____line2\nline3\n"
             selectedText_: "line0\n__line1\n"
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text_: "__line0\n____line1\n____line2\nline3\n"
             selectedText_: "__line0\n____line1\n"
-          ensureMove '2 ctrl-l',
+          ensureMove '2 right',
             text_: "______line0\n________line1\n____line2\nline3\n"
             selectedText_: "______line0\n________line1\n"
-          ensureMove 'ctrl-h',
+          ensureMove 'left',
             text_: "____line0\n______line1\n____line2\nline3\n"
             selectedText_: "____line0\n______line1\n"
-          ensureMove '1 0 0 ctrl-h',
+          ensureMove '1 0 0 left',
             text_: "line0\nline1\n____line2\nline3\n"
             selectedText_: "line0\nline1\n"
 
@@ -355,16 +356,16 @@ describe "vim-mode-plus-move-selected-text", ->
           ensureMove "V j",
             text_: "line0\n__line1\n____line2\nline3\n"
             selectedText_: "line0\n__line1\n"
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text_: "__line0\n____line1\n____line2\nline3\n"
             selectedText_: "__line0\n____line1\n"
-          ensureMove '2 ctrl-l',
+          ensureMove '2 right',
             text_: "______line0\n________line1\n____line2\nline3\n"
             selectedText_: "______line0\n________line1\n"
-          ensureMove 'ctrl-h',
+          ensureMove 'left',
             text_: "____line0\n______line1\n____line2\nline3\n"
             selectedText_: "____line0\n______line1\n"
-          ensureMove '1 0 0 ctrl-h',
+          ensureMove '1 0 0 left',
             text_: "line0\nline1\n____line2\nline3\n"
             selectedText_: "line0\nline1\n"
 
@@ -387,42 +388,42 @@ describe "vim-mode-plus-move-selected-text", ->
             oxYZ@
             oxYZ@
             """
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text: """
             oxYZ@
             oZxY@
             oZxY@
             oxYZ@
             """
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text: """
             oxYZ@
             oZ@xY
             oZ@xY
             oxYZ@
             """
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text_: """
             oxYZ@
             oZ@_xY
             oZ@_xY
             oxYZ@
             """
-          ensureMove '5 ctrl-l',
+          ensureMove '5 right',
             text_: """
             oxYZ@
             oZ@______xY
             oZ@______xY
             oxYZ@
             """
-          ensureMove '3 ctrl-h',
+          ensureMove '3 left',
             text_: """
             oxYZ@
             oZ@___xY___
             oZ@___xY___
             oxYZ@
             """
-          ensureMove '1 0 0 ctrl-h',
+          ensureMove '1 0 0 left',
             text_: """
             oxYZ@
             xYoZ@______
@@ -449,42 +450,42 @@ describe "vim-mode-plus-move-selected-text", ->
             oxYZ@
             oxYZ@
             """
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text_: """
             oxYZ@
             o_xY@
             o_xY@
             oxYZ@
             """
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text_: """
             oxYZ@
             o__xY
             o__xY
             oxYZ@
             """
-          ensureMove 'ctrl-l',
+          ensureMove 'right',
             text_: """
             oxYZ@
             o__ZxY
             o__ZxY
             oxYZ@
             """
-          ensureMove '5 ctrl-l',
+          ensureMove '5 right',
             text_: """
             oxYZ@
             o__Z@____xY
             o__Z@____xY
             oxYZ@
             """
-          ensureMove '3 ctrl-h',
+          ensureMove '3 left',
             text_: """
             oxYZ@
             o__Z@_xY___
             o__Z@_xY___
             oxYZ@
             """
-          ensureMove '1 0 0 ctrl-h',
+          ensureMove '1 0 0 left',
             text_: """
             oxYZ@
             xY_Z@______
@@ -607,7 +608,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[0, 1], [0, 3]]
               [[3, 1], [3, 3]]
             ]
-          ensure '2 cmd-K',
+          ensure '2 cmd-K', # mode shift to vB
             mode: ['visual', 'blockwise']
             selectedTextOrdered: ['oo', 'oo', 'YY', 'YY']
             text_: """
@@ -865,7 +866,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYYYYYYY
             ZZZ\n
             """
-          ensureDuplicate 'ctrl-j', # "move"
+          ensureDuplicate 'down', # "move"
             selectedTextOrdered: ['oooo', 'YYYY']
             text_: """
             ooooo____
@@ -941,7 +942,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[0, 5], [0, 9]]
               [[2, 5], [2, 9]]
             ]
-          ensureDuplicate 'ctrl-j', # "move"
+          ensureDuplicate 'down', # "move"
             selectedTextOrdered: ['xYxY', 'xYxY']
             text_: """
             oxYxY____
@@ -965,3 +966,129 @@ describe "vim-mode-plus-move-selected-text", ->
               [[1, 1], [1, 5]]
               [[3, 1], [3, 5]]
             ]
+
+  describe "complex movement", ->
+    describe "overwrite: true", ->
+      [selectedTextOrdered, originalText] = []
+      beforeEach ->
+        setOverwriteConfig(true)
+        set text: """
+          01234567890123456789012
+          90123456789012345678901
+          890123+--------+4567890
+          789012|ABCDEFGH|3456789
+          678901|IJKLMNOP|2345678
+          567890+--------+1234567
+          45678901234567890123456
+          01234567890123456789012
+          """
+
+        selectedTextOrdered = """
+          +--------+
+          |ABCDEFGH|
+          |IJKLMNOP|
+          +--------+
+          """.split("\n")
+        originalText = editor.getText()
+
+      it "move block of text", ->
+        set cursor: [2, 6]
+        ensureMove = getEnsureWithOptions({mode: ['visual', 'blockwise'], selectedTextOrdered})
+        ensureMove "ctrl-v 3 j 9 l", text: originalText
+        ensureMove "down", text: """
+          01234567890123456789012
+          90123456789012345678901
+          890123          4567890
+          789012+--------+3456789
+          678901|ABCDEFGH|2345678
+          567890|IJKLMNOP|1234567
+          456789+--------+0123456
+          01234567890123456789012
+          """
+        ensureMove "4 right", text: """
+          01234567890123456789012
+          90123456789012345678901
+          890123          4567890
+          789012    +--------+789
+          678901    |ABCDEFGH|678
+          567890    |IJKLMNOP|567
+          4567890123+--------+456
+          01234567890123456789012
+          """
+        ensureMove "1 0 up", text: """
+          0123456789+--------+012
+          9012345678|ABCDEFGH|901
+          890123    |IJKLMNOP|890
+          789012    +--------+789
+          678901          2345678
+          567890          1234567
+          45678901234567890123456
+          01234567890123456789012
+          """
+        ensureMove "7 left", text: """
+          012+--------+3456789012
+          901|ABCDEFGH|2345678901
+          890|IJKLMNOP|   4567890
+          789+--------+   3456789
+          678901          2345678
+          567890          1234567
+          45678901234567890123456
+          01234567890123456789012
+          """
+        ensureMove "down", text: """
+          01234567890123456789012
+          901+--------+2345678901
+          890|ABCDEFGH|   4567890
+          789|IJKLMNOP|   3456789
+          678+--------+   2345678
+          567890          1234567
+          45678901234567890123456
+          01234567890123456789012
+          """
+        ensureMove "5 right", text: """
+          01234567890123456789012
+          90123456+--------+78901
+          890123  |ABCDEFGH|67890
+          789012  |IJKLMNOP|56789
+          678901  +--------+45678
+          567890          1234567
+          45678901234567890123456
+          01234567890123456789012
+          """
+        ensureMove "down", text: """
+          01234567890123456789012
+          90123456789012345678901
+          890123  +--------+67890
+          789012  |ABCDEFGH|56789
+          678901  |IJKLMNOP|45678
+          567890  +--------+34567
+          45678901234567890123456
+          01234567890123456789012
+          """
+        ensureMove "2 left", text: """
+          01234567890123456789012
+          90123456789012345678901
+          890123+--------+4567890
+          789012|ABCDEFGH|3456789
+          678901|IJKLMNOP|2345678
+          567890+--------+1234567
+          45678901234567890123456
+          01234567890123456789012
+          """
+        ensureMove "2 left 5 down", text: """
+          01234567890123456789012
+          90123456789012345678901
+          890123          4567890
+          789012          3456789
+          678901          2345678
+          567890          1234567
+          45678901234567890123456
+          0123+--------+456789012
+              |ABCDEFGH|
+              |IJKLMNOP|
+              +--------+
+          """
+
+        ensure "escape u",
+          mode: 'normal',
+          text: originalText
