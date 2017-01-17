@@ -1,3 +1,7 @@
+## 0.8.1
+- Internal: Refactoring. DONE!!
+- Spec: Add complex movement with overwrite=true and undo grouping behavior.
+
 ## 0.8.0
 - Internal: Rewrote from scratch for maintainability. Fix corner case bug.
 
