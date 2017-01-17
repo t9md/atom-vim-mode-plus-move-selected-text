@@ -43,10 +43,10 @@ describe "vim-mode-plus-move-selected-text", ->
         'left': 'vim-mode-plus-user:move-selected-text-left'
         'right': 'vim-mode-plus-user:move-selected-text-right'
 
-        'cmd-K': 'vim-mode-plus-user:duplicate-selected-text-up'
-        'cmd-J': 'vim-mode-plus-user:duplicate-selected-text-down'
-        'cmd-H': 'vim-mode-plus-user:duplicate-selected-text-left'
-        'cmd-L': 'vim-mode-plus-user:duplicate-selected-text-right'
+        'cmd-up': 'vim-mode-plus-user:duplicate-selected-text-up'
+        'cmd-down': 'vim-mode-plus-user:duplicate-selected-text-down'
+        'cmd-left': 'vim-mode-plus-user:duplicate-selected-text-left'
+        'cmd-right': 'vim-mode-plus-user:duplicate-selected-text-right'
     keymapsPriority = 1
     atom.keymaps.add "test", keymaps, keymapsPriority
 
@@ -508,26 +508,26 @@ describe "vim-mode-plus-move-selected-text", ->
         it "duplicate single line", ->
           ensure 'V',
             selectedBufferRange: rowRange(0, 0)
-          ensure 'cmd-J',
+          ensure 'cmd-down',
             selectedBufferRange: rowRange(1, 1)
             text: 'line0\nline0\nline1\nline2\n'
 
         it "duplicate 2 selected line", ->
           ensure 'V j',
             selectedBufferRange: rowRange(0, 1)
-          ensure 'cmd-J',
+          ensure 'cmd-down',
             selectedBufferRange: rowRange(2, 3)
             text: "line0\nline1\nline0\nline1\nline2\n"
-          ensure 'cmd-K',
+          ensure 'cmd-up',
             selectedBufferRange: rowRange(2, 3)
             text: "line0\nline1\nline0\nline1\nline0\nline1\nline2\n"
         it "suport count", ->
           ensure 'V',
             selectedBufferRange: rowRange(0, 0)
-          ensure '2 cmd-J',
+          ensure '2 cmd-down',
             selectedBufferRange: rowRange(1, 2)
             text: "line0\nline0\nline0\nline1\nline2\n"
-          ensure '2 cmd-K',
+          ensure '2 cmd-up',
             selectedBufferRange: rowRange(1, 4)
             text: "line0\nline0\nline0\nline0\nline0\nline0\nline0\nline1\nline2\n"
       describe "overwrite: true", ->
@@ -537,19 +537,19 @@ describe "vim-mode-plus-move-selected-text", ->
         it "overrite lines down", ->
           ensure 'V',
             selectedBufferRange: rowRange(0, 0)
-          ensure 'cmd-J',
+          ensure 'cmd-down',
             text: "line0\nline0\nline2\n"
-          ensure 'cmd-J',
+          ensure 'cmd-down',
             text: "line0\nline0\nline0\n"
             selectedBufferRange: rowRange(2, 2)
-          ensure '2 cmd-J',
+          ensure '2 cmd-down',
             text: "line0\nline0\nline0\nline0\nline0\n"
             selectedBufferRange: rowRange(3, 4)
 
         it "overrite lines up", ->
           ensure 'j j V',
             selectedBufferRange: rowRange(2, 2)
-          ensure '2 cmd-K',
+          ensure '2 cmd-up',
             selectedBufferRange: rowRange(0, 1)
             text: "line2\nline2\nline2\n"
         it "adjust count when duplicate up to stop overwrite when no enough height is available", ->
@@ -563,7 +563,7 @@ describe "vim-mode-plus-move-selected-text", ->
             """
           ensure 'V j',
             selectedBufferRange: rowRange(3, 4)
-          ensure '1 0 cmd-K',
+          ensure '1 0 cmd-up',
             selectedBufferRange: rowRange(1, 2)
             text: """
             0
@@ -593,7 +593,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYY
             ZZZZ\n
             """
-          ensure 'cmd-K',
+          ensure 'cmd-up',
             mode: ['visual', 'characterwise']
             selectedTextOrdered: ['oo', 'YY']
             text_: """
@@ -608,7 +608,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[0, 1], [0, 3]]
               [[3, 1], [3, 3]]
             ]
-          ensure '2 cmd-K', # mode shift to vB
+          ensure '2 cmd-up', # mode shift to vB
             mode: ['visual', 'blockwise']
             selectedTextOrdered: ['oo', 'oo', 'YY', 'YY']
             text_: """
@@ -640,7 +640,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYY
             ZZZZ\n
             """
-          ensure 'cmd-J',
+          ensure 'cmd-down',
             mode: ['visual', 'characterwise']
             selectedTextOrdered: ['oo', 'YY']
             text_: """
@@ -655,7 +655,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[1, 1], [1, 3]]
               [[4, 1], [4, 3]]
             ]
-          ensure '2 cmd-J',
+          ensure '2 cmd-down',
             mode: ['visual', 'blockwise']
             selectedTextOrdered: ['oo', 'oo', 'YY', 'YY']
             text_: """
@@ -698,7 +698,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYY
             ZZZZ\n
             """
-          ensure 'cmd-J',
+          ensure 'cmd-down',
             mode: ['visual', 'characterwise']
             selectedTextOrdered: ['oo', 'YY']
             text: """
@@ -707,7 +707,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYY
             ZYYZ\n
             """
-          ensure '2 cmd-J',
+          ensure '2 cmd-down',
             mode: ['visual', 'blockwise']
             selectedTextOrdered: ['oo', 'oo', 'YY', 'YY']
             text: """
@@ -733,7 +733,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYY
             ZZZZ\n
             """
-          ensure 'cmd-K',
+          ensure 'cmd-up',
             mode: ['visual', 'characterwise']
             selectedTextOrdered: ['YY', 'ZZ']
             text: """
@@ -754,7 +754,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYY
             ZZZZ\n
             """
-          ensure 'v l cmd-K',
+          ensure 'v l cmd-up',
             mode: ['visual', 'characterwise']
 
   describe "duplicate right/left", ->
@@ -773,7 +773,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
       describe "overwrite: false", ->
         it "duplicate linewise right", ->
-          ensure 'V j j cmd-L',
+          ensure 'V j j cmd-right',
             selectedBufferRange: rowRange(0, 2)
             text: """
             0 |_0 |_
@@ -782,7 +782,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
             """
         it "count support", ->
-          ensure 'V j j 2 cmd-L',
+          ensure 'V j j 2 cmd-right',
             selectedBufferRange: rowRange(0, 2)
             text: """
             0 |_0 |_0 |_
@@ -792,7 +792,7 @@ describe "vim-mode-plus-move-selected-text", ->
             """
 
         it "duplicate linewise left(identical behavior to right)", ->
-          ensure 'V j j cmd-H',
+          ensure 'V j j cmd-left',
             selectedBufferRange: rowRange(0, 2)
             text: """
             0 |_0 |_
@@ -801,7 +801,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
             """
         it "duplicate linewise left with count(identical behavior to right)", ->
-          ensure 'V j j 2 cmd-H',
+          ensure 'V j j 2 cmd-left',
             selectedBufferRange: rowRange(0, 2)
             text: """
             0 |_0 |_0 |_
@@ -814,7 +814,7 @@ describe "vim-mode-plus-move-selected-text", ->
           setOverwriteConfig(true)
 
         it "duplicate linewise right(no behavior diff with overwrite=false)", ->
-          ensure 'V j j cmd-L',
+          ensure 'V j j cmd-right',
             selectedBufferRange: rowRange(0, 2)
             text: """
             0 |_0 |_
@@ -823,7 +823,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
             """
         it "duplicate linewise right(no behavior diff with overwrite=false)", ->
-          ensure 'V j j 2 cmd-L',
+          ensure 'V j j 2 cmd-right',
             selectedBufferRange: rowRange(0, 2)
             text: """
             0 |_0 |_0 |_
@@ -851,14 +851,14 @@ describe "vim-mode-plus-move-selected-text", ->
             YYY
             ZZZ\n
             """
-          ensureDuplicate 'cmd-L',
+          ensureDuplicate 'cmd-right',
             text: """
             ooooo
             xxx
             YYYYY
             ZZZ\n
             """
-          ensureDuplicate '2 cmd-L',
+          ensureDuplicate '2 cmd-right',
             selectedTextOrdered: ['oooo', 'YYYY']
             text: """
             ooooooooo
@@ -874,7 +874,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYYY____
             ZZZ__YYYY\n
             """
-          ensureDuplicate 'cmd-H',
+          ensureDuplicate 'cmd-left',
             selectedTextOrdered: ['oooo', 'YYYY']
             selectedBufferRange: [
               [[1, 5], [1, 9]]
@@ -886,7 +886,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYYY____
             ZZZ__YYYYYYYY\n
             """
-          ensureDuplicate '2 cmd-H',
+          ensureDuplicate '2 cmd-left',
             selectedTextOrdered: ['oooooooo', 'YYYYYYYY']
             selectedBufferRange: [
               [[1, 5], [1, 13]]
@@ -919,7 +919,7 @@ describe "vim-mode-plus-move-selected-text", ->
             oxYZ@
             oxYZ@\n
             """
-          ensureDuplicate 'cmd-L',
+          ensureDuplicate 'cmd-right',
             text: """
             oxYxY
             oxYZ@
@@ -930,7 +930,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[0, 3], [0, 5]]
               [[2, 3], [2, 5]]
             ]
-          ensureDuplicate '2 cmd-L',
+          ensureDuplicate '2 cmd-right',
             selectedTextOrdered: ['xYxY', 'xYxY']
             text: """
             oxYxYxYxY
@@ -954,7 +954,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[1, 5], [1, 9]]
               [[3, 5], [3, 9]]
             ]
-          ensureDuplicate 'cmd-H',
+          ensureDuplicate 'cmd-left',
             selectedTextOrdered: ['xYxY', 'xYxY']
             text_: """
             oxYxY____
