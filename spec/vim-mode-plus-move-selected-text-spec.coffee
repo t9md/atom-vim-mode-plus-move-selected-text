@@ -759,16 +759,16 @@ describe "vim-mode-plus-move-selected-text", ->
 
   describe "duplicate right/left", ->
     describe "linewise", ->
-      originalText = null
+      textOriginal = null
       beforeEach ->
-        originalText = """
+        textOriginal = """
           0 |_
           1 midle |_
           2 very long |_
 
           """
         set
-          text: originalText
+          text: textOriginal
           cursor: [0, 0]
 
       describe "overwrite: false", ->
@@ -969,7 +969,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
   describe "complex movement", ->
     describe "overwrite: true", ->
-      [selectedTextOrdered, originalText] = []
+      [selectedTextOrdered, textOriginal] = []
       beforeEach ->
         setOverwriteConfig(true)
         set text: """
@@ -989,12 +989,12 @@ describe "vim-mode-plus-move-selected-text", ->
           |IJKLMNOP|
           +--------+
           """.split("\n")
-        originalText = editor.getText()
+        textOriginal = editor.getText()
 
       it "move block of text", ->
         set cursor: [2, 6]
         ensureMove = getEnsureWithOptions({mode: ['visual', 'blockwise'], selectedTextOrdered})
-        ensureMove "ctrl-v 3 j 9 l", text: originalText
+        ensureMove "ctrl-v 3 j 9 l", text: textOriginal
         ensureMove "down", text: """
           01234567890123456789012
           90123456789012345678901
@@ -1091,13 +1091,13 @@ describe "vim-mode-plus-move-selected-text", ->
 
         ensure "escape u",
           mode: 'normal',
-          text: originalText
+          text: textOriginal
 
       it "clear overwritten state and undo grouping on mode shift", ->
         set cursor: [2, 6]
         ensureMove = getEnsureWithOptions({mode: ['visual', 'blockwise'], selectedTextOrdered})
         ensureMove "ctrl-v 3 j 9 l",
-          text: originalText
+          text: textOriginal
 
         ensureMove "down 2 right", text: """
           01234567890123456789012
@@ -1125,4 +1125,4 @@ describe "vim-mode-plus-move-selected-text", ->
           """
         ensure "escape", mode: 'normal'
         ensure "u", mode: 'normal', text: textGrouped
-        ensure "u", mode: 'normal', text: originalText
+        ensure "u", mode: 'normal', text: textOriginal
