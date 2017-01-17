@@ -92,9 +92,6 @@ setBufferRangesForBlockwiseSelection = (blockwiseSelection, ranges) ->
   blockwiseSelection.setSelectedBufferRanges(ranges, reversed: head.isReversed())
   blockwiseSelection.reverse() if wasReversed
 
-insertBlankRowAtPoint = (editor, point, count) ->
-  insertTextAtPoint(editor, point, "\n".repeat(count))
-
 # Return mutated range
 replaceRange = (editor, range, fn) ->
   text = editor.getTextInBufferRange(range)
@@ -116,7 +113,6 @@ module.exports = {
   switchToLinewise
   repeatArray
   setBufferRangesForBlockwiseSelection
-  insertBlankRowAtPoint
   replaceRange
   rowCountForSelection
 }

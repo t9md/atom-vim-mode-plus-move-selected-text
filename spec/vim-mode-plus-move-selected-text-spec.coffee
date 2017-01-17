@@ -716,7 +716,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YooY
             ZooZ
              YY
-             YY
+             YY\n
             """
         it "duplicate charwise up", ->
           set

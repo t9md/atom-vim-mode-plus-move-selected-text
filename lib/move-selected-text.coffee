@@ -1,7 +1,7 @@
 {
   ensureBufferEndWithNewLine
   extendLastBufferRowToRow
-  insertBlankRowAtPoint
+  insertTextAtPoint
   insertSpacesToPoint
   isMultiLineSelection
   repeatArray
@@ -235,26 +235,23 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
 
     [startRow, endRow] = blockwiseSelection.getBufferRowRange()
     height = blockwiseSelection.getHeight() * count
-    switch @direction
-      when 'up'
-        if @isOverwriteMode()
-          insertStartRow = startRow - height
-        else
-          insertBlankRowAtPoint(@editor, [startRow, 0], height)
-          insertStartRow = startRow
-      when 'down'
-        if @isOverwriteMode()
-          extendLastBufferRowToRow(@editor, endRow + height)
-        else
-          insertBlankRowAtPoint(@editor, [endRow + 1, 0], height)
-        insertStartRow = endRow + 1
+    if @isOverwriteMode()
+      insertionStartRow = switch @direction
+        when 'up' then startRow - height
+        when 'down' then endRow + 1
+      extendLastBufferRowToRow(@editor, insertionStartRow + height)
+    else
+      insertionStartRow = switch @direction
+        when 'up' then startRow
+        when 'down' then endRow + 1
+      insertTextAtPoint(@editor, [insertionStartRow, 0], "\n".repeat(height))
 
     newRanges = []
     selectionsOrderd = blockwiseSelection.selections.sort (a, b) -> a.compare(b)
     for selection in repeatArray(selectionsOrderd, count)
       {start, end} = selection.getBufferRange()
-      start.row = end.row = insertStartRow
-      insertStartRow++
+      start.row = end.row = insertionStartRow
+      insertionStartRow++
       insertSpacesToPoint(@editor, start)
       newRanges.push(@editor.setTextInBufferRange([start, end], selection.getText()))
 
