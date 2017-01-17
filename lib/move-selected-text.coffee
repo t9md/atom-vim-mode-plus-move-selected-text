@@ -5,7 +5,7 @@
   insertSpacesToPoint
   isMultiLineSelection
   repeatArray
-  replaceBufferRangeBy
+  replaceRange
   requireFrom
   rotateChars
   rotateRows
@@ -44,19 +44,11 @@ class MoveOrDuplicateSelectedText extends Operator
 # Move
 # -------------------------
 class MoveSelectedText extends MoveOrDuplicateSelectedText
-  hasOverwrittenForSelection: (selection) ->
-    stateManager.get(@editor).overwrittenBySelection.has(selection)
-
   getOverwrittenForSelection: (selection) ->
     stateManager.get(@editor).overwrittenBySelection.get(selection)
 
   setOverwrittenForSelection: (selection, overwritten) ->
     stateManager.get(@editor).overwrittenBySelection.set(selection, overwritten)
-
-  getOrInitOverwrittenForSelection: (selection, initializer) ->
-    unless @hasOverwrittenForSelection(selection)
-      @setOverwrittenForSelection(selection, initializer())
-    @getOverwrittenForSelection(selection)
 
   getCount: ->
     count = super
@@ -101,10 +93,9 @@ class MoveSelectedTextUp extends MoveSelectedText
     dstText = @editor.getTextInBufferRange(dstRange)
 
     if @isOverwriteMode()
-      overwritten = @getOrInitOverwrittenForSelection selection, ->
-        new Array(srcText.length).fill(' ')
+      overwritten = @getOverwrittenForSelection(selection) ? new Array(srcText.length).fill(' ')
       @setOverwrittenForSelection(selection, dstText.split(''))
-      dstText = overwritten.join('')
+      dstText = overwritten?.join('')
 
     @editor.setTextInBufferRange(srcRange, dstText)
     @editor.setTextInBufferRange(dstRange, srcText)
@@ -115,24 +106,21 @@ class MoveSelectedTextUp extends MoveSelectedText
       when 'up' then [[-1, 0], [0, 0]]
       when 'down' then [[0, 0], [1, 0]]
 
-    range = selection.getBufferRange()
-    rangeToMutate = range.translate(translation...)
+    rangeToMutate = selection.getBufferRange().translate(translation...)
     extendLastBufferRowToRow(@editor, rangeToMutate.end.row)
-
-    overwritten = null
-    if @isOverwriteMode()
-      height = range.getRowCount() - 1
-      overwritten = @getOrInitOverwrittenForSelection selection, ->
-        new Array(height).fill('')
-
-    newRange = replaceBufferRangeBy @editor, rangeToMutate, (text) =>
-      rows = text.replace(/\n$/, '').split("\n")
-      {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
-      @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-      rows.join("\n") + "\n"
-
+    newRange = replaceRange(@editor, rangeToMutate, (text) => @rotateRows(text, selection))
     rangeToSelect = newRange.translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, reversed: selection.isReversed())
+
+  rotateRows: (text, selection) ->
+    rows = text.replace(/\n$/, '').split("\n")
+
+    if @isOverwriteMode()
+      overwritten = @getOverwrittenForSelection(selection) ? new Array(rows.length - 1).fill('')
+
+    {rows, overwritten} = rotateRows(rows, @direction, {overwritten})
+    @setOverwrittenForSelection(selection, overwritten) if overwritten.length
+    rows.join("\n") + "\n"
 
 class MoveSelectedTextDown extends MoveSelectedTextUp
   direction: 'down'
@@ -150,19 +138,19 @@ class MoveSelectedTextLeft extends MoveSelectedText
 
     rangeToMutate = selection.getBufferRange().translate(translation...)
     insertSpacesToPoint(@editor, rangeToMutate.end)
-
-    overwritten = null
-    if @isOverwriteMode()
-      textLength = selection.getText().length
-      overwritten = @getOrInitOverwrittenForSelection selection, ->
-        new Array(textLength).fill(' ')
-
-    newRange = replaceBufferRangeBy @editor, rangeToMutate, (text) =>
-      {chars, overwritten} = rotateChars(text.split(''), @direction, {overwritten})
-      @setOverwrittenForSelection(selection, overwritten) if overwritten.length
-      chars.join('')
+    newRange = replaceRange(@editor, rangeToMutate, (text) => @rotateChars(text, selection))
     rangeToSelect = newRange.translate(translation.reverse()...)
     selection.setBufferRange(rangeToSelect, reversed: selection.isReversed())
+
+  rotateChars: (text, selection) ->
+    chars = text.split('')
+
+    if @isOverwriteMode()
+      overwritten = @getOverwrittenForSelection(selection) ? new Array(chars.length - 1).fill(' ')
+
+    {chars, overwritten} = rotateChars(chars, @direction, {overwritten})
+    @setOverwrittenForSelection(selection, overwritten) if overwritten.length
+    chars.join('')
 
   moveLinewise: (selection) ->
     switch @direction
@@ -289,10 +277,8 @@ class DuplicateSelectedTextLeft extends DuplicateSelectedText
   # No behavior diff by isOverwriteMode() and direction('left' or 'right')
   duplicateLinewise: (selection) ->
     amount = @getCount() + 1
-    newText = selection.getText().split("\n")
-      .map (rowText) -> rowText.repeat(amount)
-      .join("\n")
-    selection.insertText(newText, select: true)
+    rows = selection.getText().split("\n").map((row) -> row.repeat(amount))
+    selection.insertText(rows.join("\n"), select: true)
 
   # Return adjusted count to avoid partial duplicate in overwrite-mode
   getCountForSelection: (selection) ->

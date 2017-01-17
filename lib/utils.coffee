@@ -96,9 +96,9 @@ insertBlankRowAtPoint = (editor, point, count) ->
   insertTextAtPoint(editor, point, "\n".repeat(count))
 
 # Return mutated range
-replaceBufferRangeBy = (editor, range, fn) ->
-  oldText = editor.getTextInBufferRange(range)
-  editor.setTextInBufferRange(range, fn(oldText))
+replaceRange = (editor, range, fn) ->
+  text = editor.getTextInBufferRange(range)
+  editor.setTextInBufferRange(range, fn(text))
 
 rowCountForSelection = (selection) ->
   [startRow, endRow ] = selection.getBufferRowRange()
@@ -117,6 +117,6 @@ module.exports = {
   repeatArray
   setBufferRangesForBlockwiseSelection
   insertBlankRowAtPoint
-  replaceBufferRangeBy
+  replaceRange
   rowCountForSelection
 }
