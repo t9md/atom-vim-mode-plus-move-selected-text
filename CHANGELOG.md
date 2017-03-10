@@ -1,3 +1,7 @@
+## 0.8.2
+- Fix: down/up move, duplicate in `visual-characterwise` mode.
+  - Need to update vim-mode-plus 0.84.1 or later.
+
 ## 0.8.1
 - Internal: Refactoring. DONE!!
 - Spec: Add complex movement with overwrite=true and undo grouping behavior.
