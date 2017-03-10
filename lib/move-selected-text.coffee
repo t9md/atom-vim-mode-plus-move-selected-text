@@ -10,9 +10,9 @@
   rotateChars
   rotateRows
   setBufferRangesForBlockwiseSelection
-  switchToLinewise
   rowCountForSelection
 } = require './utils'
+{switchToLinewise} = requireFrom('vim-mode-plus', 'selection-wrapper')
 
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')

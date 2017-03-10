@@ -6,8 +6,6 @@ requireFrom = (pack, path) ->
   packPath = atom.packages.resolvePackagePath(pack)
   require "#{packPath}/lib/#{path}"
 
-swrap = requireFrom('vim-mode-plus', 'selection-wrapper')
-
 insertTextAtPoint = (editor, point, text) ->
   editor.setTextInBufferRange([point, point], text)
 
@@ -71,14 +69,6 @@ extendLastBufferRowToRow = (editor, row) ->
     eof = editor.getEofBufferPosition()
     insertTextAtPoint(editor, eof, "\n".repeat(count))
 
-# Return function to restore
-switchToLinewise = (editor) ->
-  swrap.saveProperties(editor)
-  swrap.applyWise(editor, 'linewise')
-  new Disposable ->
-    swrap.normalize(editor)
-    swrap.applyWise(editor, 'characterwise')
-
 # e.g.
 #  repeatArray([1, 2, 3], 3) => [ 1, 2, 3, 1, 2, 3, 1, 2, 3 ]
 repeatArray = (array, amount) ->
@@ -110,7 +100,6 @@ module.exports = {
   insertSpacesToPoint
   extendLastBufferRowToRow
   ensureBufferEndWithNewLine
-  switchToLinewise
   repeatArray
   setBufferRangesForBlockwiseSelection
   replaceRange
