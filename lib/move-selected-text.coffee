@@ -12,7 +12,7 @@
   setBufferRangesForBlockwiseSelection
   rowCountForSelection
 } = require './utils'
-{switchToLinewise} = requireFrom('vim-mode-plus', 'selection-wrapper')
+swrap = {switchToLinewise} = requireFrom('vim-mode-plus', 'selection-wrapper')
 
 Base = requireFrom('vim-mode-plus', 'base')
 Operator = Base.getClass('Operator')
@@ -66,6 +66,11 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
     @countTimes @getCount(), =>
       for selection in @getSelections()
         fn(selection)
+        swrap(selection).saveProperties()
+        swrap(selection).fixPropertyRowToRowRange()
+      if @submode is 'blockwise'
+        for blockwiseSelection in @vimState.getBlockwiseSelections()
+          blockwiseSelection.saveProperties()
 
   execute: ->
     @withGroupChanges =>
@@ -168,6 +173,7 @@ class DuplicateSelectedText extends MoveOrDuplicateSelectedText
     linewiseDisposable = switchToLinewise(@editor) unless @vimState.isMode('visual', 'linewise')
     for selection in @getSelections()
       @duplicateLinewise(selection)
+      swrap(selection).fixPropertyRowToRowRange()
     linewiseDisposable?.dispose()
 
 class DuplicateSelectedTextUp extends DuplicateSelectedText
@@ -188,6 +194,10 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
 
         for blockwiseSelection in @getBlockwiseSelections()
           @duplicateBlockwise(blockwiseSelection)
+        for $selection in swrap.getSelections(@editor)
+          $selection.saveProperties()
+        for blockwiseSelection in @getBlockwiseSelections()
+          blockwiseSelection.saveProperties()
 
         isOneHeight = (blockwiseSelection) -> blockwiseSelection.getHeight() is 1
         if wasCharacterwise and @vimState.getBlockwiseSelections().every(isOneHeight)
