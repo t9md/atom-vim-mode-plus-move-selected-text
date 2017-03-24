@@ -68,9 +68,6 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
         fn(selection)
         swrap(selection).saveProperties()
         swrap(selection).fixPropertyRowToRowRange()
-      if @submode is 'blockwise'
-        for blockwiseSelection in @vimState.getBlockwiseSelections()
-          blockwiseSelection.saveProperties()
 
   execute: ->
     @withGroupChanges =>
@@ -196,8 +193,6 @@ class DuplicateSelectedTextUp extends DuplicateSelectedText
           @duplicateBlockwise(blockwiseSelection)
         for $selection in swrap.getSelections(@editor)
           $selection.saveProperties()
-        for blockwiseSelection in @getBlockwiseSelections()
-          blockwiseSelection.saveProperties()
 
         isOneHeight = (blockwiseSelection) -> blockwiseSelection.getHeight() is 1
         if wasCharacterwise and @vimState.getBlockwiseSelections().every(isOneHeight)
