@@ -1,3 +1,6 @@
+## 0.9.0
+- Fix to work in vmp v0.85 or later. This version is not work in v0.84.1 and older version.
+
 ## 0.8.2
 - Fix: down/up move, duplicate in `visual-characterwise` mode.
   - Need to update vim-mode-plus 0.84.1 or later.
