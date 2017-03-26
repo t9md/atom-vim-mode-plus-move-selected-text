@@ -66,7 +66,6 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
     @countTimes @getCount(), =>
       for selection in @getSelections()
         fn(selection)
-        swrap(selection).saveProperties()
         swrap(selection).fixPropertyRowToRowRange()
 
   execute: ->
@@ -77,6 +76,8 @@ class MoveSelectedText extends MoveOrDuplicateSelectedText
         linewiseDisposable?.dispose()
       else
         @moveSelections(@moveCharacterwise.bind(this))
+        for $selection in swrap.getSelections(@editor)
+          $selection.saveProperties()
 
 class MoveSelectedTextUp extends MoveSelectedText
   direction: 'up'
