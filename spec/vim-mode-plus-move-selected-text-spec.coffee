@@ -31,11 +31,6 @@ describe "vim-mode-plus-move-selected-text", ->
       ensure(keystroke, _.defaults(_.clone(options), optionsBase))
 
   beforeEach ->
-    getVimState (state, vim) ->
-      vimState = state
-      {editor, editorElement} = state
-      {set, ensure, keystroke} = vim
-
     keymaps =
       'atom-text-editor.vim-mode-plus.visual-mode':
         'up': 'vim-mode-plus-user:move-selected-text-up'
@@ -50,8 +45,21 @@ describe "vim-mode-plus-move-selected-text", ->
     keymapsPriority = 1
     atom.keymaps.add "test", keymaps, keymapsPriority
 
+    activationPromise = null
+    runs ->
+      activationPromise = atom.packages.activatePackage('vim-mode-plus-move-selected-text')
+
+    runs ->
+      getVimState (state, vim) ->
+        vimState = state
+        {editor, editorElement} = state
+        {set, ensure, keystroke} = vim
+        editor.setText('a')
+        keystroke "v up escape" # invoke move-selected-text-up in visual-mode
+        editor.setText('')
+
     waitsForPromise ->
-      atom.packages.activatePackage('vim-mode-plus-move-selected-text')
+      activationPromise
 
   describe "overwrite config", ->
     [vimState1, vimState2, vimState3, vimState4, allVimState] = []
