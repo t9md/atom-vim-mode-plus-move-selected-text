@@ -1,3 +1,6 @@
+## 0.10.0
+- Use `activationCommands` to reduce startup time of atom.
+
 ## 0.9.0
 - Fix to work in vmp v0.85 or later. This version is not work in v0.84.1 and older version.
 
