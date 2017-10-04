@@ -1,3 +1,8 @@
+## 0.11.0: WIP
+- Maintenance: Convert all codes(except test) to JavaScript from CoffeeScript.
+  - Now all operation classes are ES6 class.
+  - CoffeeScript's class cannot inherit from ES6 class.
+
 ## 0.10.0
 - Use `activationCommands` to reduce startup time of atom.
 
