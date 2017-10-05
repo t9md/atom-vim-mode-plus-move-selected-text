@@ -28,7 +28,8 @@
       }
     }
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "underscore-plus": "^1.6.6"
   }
 }
