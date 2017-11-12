@@ -20,15 +20,11 @@ setOverwriteConfig = (value) ->
 {getVimState, TextData, dispatch} = requireFrom 'vim-mode-plus', 'spec/spec-helper'
 
 describe "vim-mode-plus-move-selected-text", ->
-  [set, ensure, keystroke, editor, editorElement, vimState] = []
+  [set, ensure, keystroke, editor, editorElement, vimState, bindEnsureOption] = []
 
   ensureOverwriteClass = (target, bool) ->
     className = 'vim-mode-plus-move-selected-text-overwrite'
     expect(target.classList.contains(className)).toBe(bool)
-
-  getEnsureWithOptions = (optionsBase) ->
-    (keystroke, options) ->
-      ensure(keystroke, _.defaults(_.clone(options), optionsBase))
 
   beforeEach ->
     keymaps =
@@ -53,9 +49,9 @@ describe "vim-mode-plus-move-selected-text", ->
       getVimState (state, vim) ->
         vimState = state
         {editor, editorElement} = state
-        {set, ensure, keystroke} = vim
+        {set, ensure, keystroke, bindEnsureOption} = vim
         editor.setText('a')
-        keystroke "v up escape" # invoke move-selected-text-up in visual-mode
+        ensure "v up escape" # invoke move-selected-text-up in visual-mode
         editor.setText('')
 
     waitsForPromise ->
@@ -137,31 +133,31 @@ describe "vim-mode-plus-move-selected-text", ->
           set textC: "|line0\nline1\nline2\n"
 
         it "[case-1] one line", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line0\n", selectionIsReversed: false)
           ensureMove 'V', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "line1\nline0\nline2\n" # down
           ensureMove 'down', text: "line1\nline2\nline0\n" # down
           ensureMove 'up', text: "line1\nline0\nline2\n" # up
           ensureMove 'up', text: "line0\nline1\nline2\n" # up
         it "[case-2] two line", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "line2\nline0\nline1\n"
           ensureMove 'up', text: "line0\nline1\nline2\n"
         it "[case-3] two line, selection is reversed: keep reversed state", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: true)
+          ensureMove = bindEnsureOption(selectedText: "line0\nline1\n", selectionIsReversed: true)
           set cursor: [1, 0]
           ensureMove 'V k', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "line2\nline0\nline1\n"
           ensureMove 'up', text: "line0\nline1\nline2\n"
         it "extends final row when move down", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line2\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line2\n", selectionIsReversed: false)
           set cursor: [2, 0]
           ensureMove 'V', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "line0\nline1\n\nline2\n"
           ensureMove 'down', text: "line0\nline1\n\n\nline2\n"
         it "support count", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
           ensureMove '2 down', text: "line2\n\nline0\nline1\n"
           ensureMove '2 up', text: "line0\nline1\nline2\n\n"
@@ -178,31 +174,31 @@ describe "vim-mode-plus-move-selected-text", ->
           """
 
         it "[case-1] one line", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line0\n", selectionIsReversed: false)
           ensureMove 'V', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "\nline0\nline2\n"
           ensureMove 'down', text: "\nline1\nline0\n"
           ensureMove 'up', text: "\nline0\nline2\n"
           ensureMove 'up', text: "line0\nline1\nline2\n"
         it "[case-2] two line", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "\nline0\nline1\n"
           ensureMove 'up', text: "line0\nline1\nline2\n"
         it "[case-3] two line, selection is reversed: keep reversed state", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: true)
+          ensureMove = bindEnsureOption(selectedText: "line0\nline1\n", selectionIsReversed: true)
           set cursor: [1, 0]
           ensureMove 'V k', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "\nline0\nline1\n"
           ensureMove 'up', text: "line0\nline1\nline2\n"
         it "extends final row when move down", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line2\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line2\n", selectionIsReversed: false)
           set cursor: [2, 0]
           ensureMove 'V', text: "line0\nline1\nline2\n"
           ensureMove 'down', text: "line0\nline1\n\nline2\n"
           ensureMove 'down', text: "line0\nline1\n\n\nline2\n"
         it "support count", ->
-          ensureMove = getEnsureWithOptions(selectedText: "line0\nline1\n", selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectedText: "line0\nline1\n", selectionIsReversed: false)
           ensureMove 'V j', text: "line0\nline1\nline2\n"
           ensureMove '2 down', text: "\n\nline0\nline1\n"
           ensureMove '2 down', text: "\n\nline2\n\nline0\nline1\n"
@@ -221,7 +217,7 @@ describe "vim-mode-plus-move-selected-text", ->
             """
 
         it "move characterwise, support multiple selection", ->
-          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
+          ensureMove = bindEnsureOption(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
           ensureMove 'v l',
             text: """
             ooo
@@ -277,7 +273,7 @@ describe "vim-mode-plus-move-selected-text", ->
             """
 
         it "move characterwise, support multiple selection", ->
-          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
+          ensureMove = bindEnsureOption(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
           ensureMove 'v l',
             text_: """
             ooo
@@ -336,7 +332,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
       describe "overwrite: false", ->
         it "indent/outdent, count support", ->
-          ensureMove = getEnsureWithOptions(selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectionIsReversed: false)
           ensureMove "V j",
             text_: "line0\n__line1\n____line2\nline3\n"
             selectedText_: "line0\n__line1\n"
@@ -360,7 +356,7 @@ describe "vim-mode-plus-move-selected-text", ->
           setOverwriteConfig(true)
 
         it "indent/outdent, count support", ->
-          ensureMove = getEnsureWithOptions(selectionIsReversed: false)
+          ensureMove = bindEnsureOption(selectionIsReversed: false)
           ensureMove "V j",
             text_: "line0\n__line1\n____line2\nline3\n"
             selectedText_: "line0\n__line1\n"
@@ -388,7 +384,7 @@ describe "vim-mode-plus-move-selected-text", ->
             oxYZ@
             """
         it "move right/left count support", ->
-          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
+          ensureMove = bindEnsureOption(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
           ensureMove 'v l',
             text: """
             oxYZ@
@@ -450,7 +446,7 @@ describe "vim-mode-plus-move-selected-text", ->
             oxYZ@
             """
         it "move right/left count support", ->
-          ensureMove = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
+          ensureMove = bindEnsureOption(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
           ensureMove 'v l',
             text: """
             oxYZ@
@@ -851,22 +847,24 @@ describe "vim-mode-plus-move-selected-text", ->
             ZZZ\n
             """
         it "duplicate charwise", ->
-          ensureDuplicate = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['oo', 'YY'])
-          ensureDuplicate 'v l',
+          ensure_ = bindEnsureOption(mode: ['visual', 'characterwise'])
+          ensure_ 'v l',
+            selectedTextOrdered: ['oo', 'YY']
             text: """
             ooo
             xxx
             YYY
             ZZZ\n
             """
-          ensureDuplicate 'cmd-right',
+          ensure_ 'cmd-right',
+            selectedTextOrdered: ['oo', 'YY']
             text: """
             ooooo
             xxx
             YYYYY
             ZZZ\n
             """
-          ensureDuplicate '2 cmd-right',
+          ensure_ '2 cmd-right',
             selectedTextOrdered: ['oooo', 'YYYY']
             text: """
             ooooooooo
@@ -874,7 +872,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYYYYYYY
             ZZZ\n
             """
-          ensureDuplicate 'down', # "move"
+          ensure_ 'down', # "move"
             selectedTextOrdered: ['oooo', 'YYYY']
             text_: """
             ooooo____
@@ -882,7 +880,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYYY____
             ZZZ__YYYY\n
             """
-          ensureDuplicate 'cmd-left',
+          ensure_ 'cmd-left',
             selectedTextOrdered: ['oooo', 'YYYY']
             selectedBufferRange: [
               [[1, 5], [1, 9]]
@@ -894,7 +892,7 @@ describe "vim-mode-plus-move-selected-text", ->
             YYYYY____
             ZZZ__YYYYYYYY\n
             """
-          ensureDuplicate '2 cmd-left',
+          ensure_ '2 cmd-left',
             selectedTextOrdered: ['oooooooo', 'YYYYYYYY']
             selectedBufferRange: [
               [[1, 5], [1, 13]]
@@ -919,15 +917,17 @@ describe "vim-mode-plus-move-selected-text", ->
             """
 
         it "duplicate charwise", ->
-          ensureDuplicate = getEnsureWithOptions(mode: ['visual', 'characterwise'], selectedTextOrdered: ['xY', 'xY'])
-          ensureDuplicate 'v l',
+          ensure_ = bindEnsureOption(mode: ['visual', 'characterwise'])
+          ensure_ 'v l',
+            selectedTextOrdered: ['xY', 'xY']
             text: """
             oxYZ@
             oxYZ@
             oxYZ@
             oxYZ@\n
             """
-          ensureDuplicate 'cmd-right',
+          ensure_ 'cmd-right',
+            selectedTextOrdered: ['xY', 'xY']
             text: """
             oxYxY
             oxYZ@
@@ -938,7 +938,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[0, 3], [0, 5]]
               [[2, 3], [2, 5]]
             ]
-          ensureDuplicate '2 cmd-right',
+          ensure_ '2 cmd-right',
             selectedTextOrdered: ['xYxY', 'xYxY']
             text: """
             oxYxYxYxY
@@ -950,7 +950,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[0, 5], [0, 9]]
               [[2, 5], [2, 9]]
             ]
-          ensureDuplicate 'down', # "move"
+          ensure_ 'down', # "move"
             selectedTextOrdered: ['xYxY', 'xYxY']
             text_: """
             oxYxY____
@@ -962,7 +962,7 @@ describe "vim-mode-plus-move-selected-text", ->
               [[1, 5], [1, 9]]
               [[3, 5], [3, 9]]
             ]
-          ensureDuplicate 'cmd-left',
+          ensure_ 'cmd-left',
             selectedTextOrdered: ['xYxY', 'xYxY']
             text_: """
             oxYxY____
@@ -1001,7 +1001,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
       it "move block of text", ->
         set cursor: [2, 6]
-        ensureMove = getEnsureWithOptions({mode: ['visual', 'blockwise'], selectedTextOrdered})
+        ensureMove = bindEnsureOption({mode: ['visual', 'blockwise'], selectedTextOrdered})
         ensureMove "ctrl-v 3 j 9 l", text: textOriginal
         ensureMove "down", text: """
           01234567890123456789012
@@ -1103,7 +1103,7 @@ describe "vim-mode-plus-move-selected-text", ->
 
       it "clear overwritten state and undo grouping on mode shift", ->
         set cursor: [2, 6]
-        ensureMove = getEnsureWithOptions({mode: ['visual', 'blockwise'], selectedTextOrdered})
+        ensureMove = bindEnsureOption({mode: ['visual', 'blockwise'], selectedTextOrdered})
         ensureMove "ctrl-v 3 j 9 l",
           text: textOriginal
 

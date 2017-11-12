@@ -1,3 +1,6 @@
+## 0.11.1:
+- Maintenance: Catchup minor vmp changes, and update broken specs.
+
 ## 0.11.0:
 - Maintenance: Convert all code(except test) to JavaScript from CoffeeScript.
   - Now all operation classes are ES6 class.
