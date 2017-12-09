@@ -1,3 +1,6 @@
+## 0.12.0:
+- Maintenance: Catchup vmp changes, no longer use service.Base, use getClass instead.
+
 ## 0.11.1:
 - Maintenance: Catchup minor vmp changes, and update broken specs.
 
